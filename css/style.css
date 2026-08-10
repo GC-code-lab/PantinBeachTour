@@ -37,12 +37,25 @@ body {
 }
 
 /* Le tableau des phases finales est large : pas de limite pour éviter le
-   défilement horizontal inutile sur un grand écran. */
+   défilement horizontal inutile sur un grand écran. On n'utilise plus
+   align-items: center ici : sur un écran plus étroit que le tableau, ça le
+   ferait déborder à parts égales des deux côtés, et le débordement à gauche
+   (les barrages) devient alors impossible à atteindre en défilant (le scroll
+   ne va jamais en négatif). Le centrage se fait plutôt via margin: auto
+   directement sur le contenu du tableau (voir .bracket-titles/.bracket-tree) :
+   ça centre quand ça tient, et laisse défiler depuis la gauche sinon. */
 .bracket-main {
   max-width: none;
   display: flex;
   flex-direction: column;
-  align-items: center;
+}
+
+.bracket-main h1 {
+  text-align: center;
+}
+
+.bracket-main .category-toggle {
+  justify-content: center;
 }
 
 h1, h2, h3 {
@@ -581,6 +594,8 @@ section {
 .bracket-titles {
   position: relative;
   height: 22px;
+  margin-left: auto;
+  margin-right: auto;
   margin-bottom: 0.5rem;
 }
 
@@ -596,6 +611,7 @@ section {
 
 .bracket-tree {
   position: relative;
+  margin: 0 auto;
 }
 
 .bracket-connectors {
