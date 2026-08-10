@@ -28,18 +28,21 @@ const logoutButton = document.getElementById("logout-button");
 const rolesSection = document.getElementById("roles-section");
 const inscriptionTabButton = document.querySelector('.tab-button[data-tab="tab-inscription"]');
 const poulesTabButton = document.querySelector('.tab-button[data-tab="tab-poules"]');
+const matchsTabButton = document.querySelector('.tab-button[data-tab="tab-matchs"]');
 
 logoutButton.addEventListener("click", async () => {
   await supabaseClient.auth.signOut();
 });
 
 // Seuls les admins voient l'inscription, les têtes de série/poules, et la gestion des rôles.
-// Les scorers n'ont accès qu'à Connexion (pour se déconnecter) et Matchs & Résultats.
-// Un rôle inconnu/absent est traité comme le plus restrictif, par sécurité.
+// Scorer ET admin voient Matchs & Résultats. Un compte sans rôle (créé mais pas encore
+// assigné) ne voit RIEN de tout ça — juste l'onglet Connexion, comme un visiteur non connecté.
 function applyRoleUI(role) {
   const isAdmin = role === "admin";
+  const hasAccess = role === "admin" || role === "scorer";
   inscriptionTabButton.hidden = !isAdmin;
   poulesTabButton.hidden = !isAdmin;
+  matchsTabButton.hidden = !hasAccess;
   rolesSection.hidden = !isAdmin;
   if (isAdmin) loadAccountsWithoutRole();
 }
