@@ -712,6 +712,15 @@ section {
   color: white;
 }
 
+.site-footer p {
+  margin: 0.25rem 0;
+}
+
+.site-footer-sub {
+  font-size: 0.85rem;
+  opacity: 0.75;
+}
+
 /* Mobile */
 
 @media (max-width: 640px) {
