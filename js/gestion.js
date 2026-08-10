@@ -23,6 +23,12 @@ categoryButtons.forEach((button) => {
   });
 });
 
+// Seul ce compte peut supprimer un compte ou déclasser un autre admin (aussi
+// vérifié côté serveur dans assign_role/delete_account — ceci n'est qu'un
+// confort d'affichage, pas la vraie barrière de sécurité).
+const SUPER_ADMIN_EMAIL = "gabriel.cohen.1997@gmail.com";
+let currentUserEmail = null;
+
 const adminEmailDisplay = document.getElementById("admin-email-display");
 const logoutButton = document.getElementById("logout-button");
 const rolesSection = document.getElementById("roles-section");
@@ -45,7 +51,7 @@ function applyRoleUI(role) {
   matchsTabButton.hidden = !hasAccess;
   rolesSection.hidden = !isAdmin;
   if (isAdmin) {
-    loadAccountsWithoutRole();
+    loadAccountsList();
     loadSignupCodes();
   }
 }
@@ -57,6 +63,7 @@ supabaseClient.auth.onAuthStateChange(async (_event, session) => {
     return;
   }
   adminEmailDisplay.textContent = session.user.email;
+  currentUserEmail = session.user.email;
 
   const { data: profile } = await supabaseClient
     .from("profiles")
@@ -68,97 +75,121 @@ supabaseClient.auth.onAuthStateChange(async (_event, session) => {
   loadAdminData();
 });
 
-const roleForm = document.getElementById("role-form");
-const roleMessage = document.getElementById("role-message");
-const roleEmailSelect = document.getElementById("role-email");
-const rolesToggle = document.getElementById("roles-toggle");
-const rolesList = document.getElementById("roles-list");
+const accountsList = document.getElementById("accounts-list");
 
-// Comptes créés (via "Créer un compte" sur l'écran de connexion) mais sans rôle
-// assigné pour l'instant — c'est parmi eux qu'on choisit pour "Ajout de rôle".
-async function loadAccountsWithoutRole() {
-  const { data, error } = await supabaseClient.rpc("list_accounts_without_role");
-  roleEmailSelect.innerHTML = "";
+// Liste unique de tous les comptes (avec ou sans rôle) avec, pour chacun, le
+// contrôle pour attribuer/changer son rôle directement. Un compte déjà admin
+// est affiché comme un badge fixe : impossible de le rétrograder depuis cette
+// interface, sauf pour SUPER_ADMIN_EMAIL qui peut aussi tout supprimer.
+// L'RPC assign_role/delete_account refait les mêmes vérifications côté
+// serveur : ceci n'est qu'un affichage, pas la vraie barrière de sécurité.
+async function loadAccountsList() {
+  accountsList.innerHTML = "Chargement…";
 
-  if (error || !data || data.length === 0) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "Aucun compte sans rôle pour l'instant";
-    roleEmailSelect.appendChild(option);
-    roleEmailSelect.disabled = true;
-    return;
-  }
-
-  roleEmailSelect.disabled = false;
-  data.forEach((account) => {
-    const option = document.createElement("option");
-    option.value = account.email;
-    option.textContent = account.email;
-    roleEmailSelect.appendChild(option);
-  });
-}
-
-roleForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-
-  const email = roleEmailSelect.value;
-  if (!email) {
-    alert("Aucun compte sans rôle à sélectionner.");
-    return;
-  }
-  const role = roleForm.querySelector('input[name="role"]:checked').value;
-
-  const { error } = await supabaseClient.rpc("assign_role", {
-    target_email: email,
-    target_role: role,
-  });
+  const { data, error } = await supabaseClient.rpc("list_all_accounts");
 
   if (error) {
-    roleMessage.textContent = "Erreur : " + error.message;
-    roleMessage.style.color = "var(--color-coral)";
-    return;
-  }
-
-  roleMessage.textContent = `Rôle "${role}" attribué à ${email}.`;
-  roleMessage.style.color = "var(--color-ocean-dark)";
-
-  loadAccountsWithoutRole();
-  if (rolesToggle.getAttribute("aria-expanded") === "true") {
-    loadRolesList();
-  }
-});
-
-async function loadRolesList() {
-  rolesList.innerHTML = "Chargement…";
-
-  const { data, error } = await supabaseClient.rpc("list_role_accounts");
-
-  if (error) {
-    rolesList.textContent = "Erreur de chargement : " + error.message;
+    accountsList.textContent = "Erreur de chargement : " + error.message;
     return;
   }
 
   if (!data || data.length === 0) {
-    rolesList.textContent = "Aucun compte avec un rôle pour l'instant.";
+    accountsList.textContent = "Aucun compte pour l'instant.";
     return;
   }
 
-  rolesList.innerHTML = "";
-  const list = document.createElement("ul");
-  data.forEach((account) => {
-    const item = document.createElement("li");
-    item.textContent = `${account.email} — ${account.role}`;
-    list.appendChild(item);
-  });
-  rolesList.appendChild(list);
-}
+  const isSuperAdmin = currentUserEmail === SUPER_ADMIN_EMAIL;
 
-rolesToggle.addEventListener("click", () => {
-  const isOpen = rolesToggle.getAttribute("aria-expanded") === "true";
-  rolesToggle.setAttribute("aria-expanded", String(!isOpen));
-  rolesList.hidden = isOpen;
-  if (!isOpen) loadRolesList();
-});
+  // Le compte principal reste toujours tout en haut et toujours admin, sans
+  // bouton pour le changer (même pour lui-même) — assign_role le refuse aussi
+  // côté serveur, donc ce n'est pas seulement caché à l'affichage.
+  const sortedAccounts = [...data].sort((a, b) => {
+    if (a.email === SUPER_ADMIN_EMAIL) return -1;
+    if (b.email === SUPER_ADMIN_EMAIL) return 1;
+    return a.email.localeCompare(b.email);
+  });
+
+  accountsList.innerHTML = "";
+  sortedAccounts.forEach((account) => {
+    const row = document.createElement("div");
+    row.className = "team-row";
+
+    const emailSpan = document.createElement("span");
+    emailSpan.textContent = account.email;
+    row.appendChild(emailSpan);
+
+    const isLockedAdmin = account.email === SUPER_ADMIN_EMAIL || (account.role === "admin" && !isSuperAdmin);
+
+    if (isLockedAdmin) {
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = account.email === SUPER_ADMIN_EMAIL ? "Propriétaire" : "Admin";
+      row.appendChild(badge);
+    } else {
+      if (!account.role) {
+        const noneBadge = document.createElement("span");
+        noneBadge.className = "badge";
+        noneBadge.textContent = "Aucun rôle";
+        row.appendChild(noneBadge);
+      }
+
+      const toggle = document.createElement("div");
+      toggle.className = "role-toggle";
+
+      const options = [
+        { value: "scorer", label: "Scorer" },
+        { value: "admin", label: "Admin" },
+      ];
+
+      options.forEach((option) => {
+        const isActive = account.role === option.value;
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "category-button" + (isActive ? " active" : "");
+        button.textContent = option.label;
+        // Cliquer sur le rôle déjà actif le retire (remove_role) ; cliquer sur
+        // l'autre l'attribue (assign_role) — un seul clic pour changer ou enlever.
+        button.addEventListener("click", async () => {
+          const { error: roleError } = isActive
+            ? await supabaseClient.rpc("remove_role", { target_email: account.email })
+            : await supabaseClient.rpc("assign_role", {
+                target_email: account.email,
+                target_role: option.value,
+              });
+          if (roleError) {
+            alert("Erreur : " + roleError.message);
+            return;
+          }
+          loadAccountsList();
+        });
+        toggle.appendChild(button);
+      });
+
+      row.appendChild(toggle);
+    }
+
+    if (isSuperAdmin && account.email !== currentUserEmail) {
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "button button-sm button-danger";
+      deleteButton.textContent = "Supprimer";
+      deleteButton.addEventListener("click", async () => {
+        if (!confirm(`Supprimer le compte ${account.email} ? Action irréversible.`)) return;
+        const { error: deleteError } = await supabaseClient.rpc("delete_account", {
+          target_email: account.email,
+        });
+        if (deleteError) {
+          alert("Erreur : " + deleteError.message);
+          return;
+        }
+        loadAccountsList();
+      });
+      row.appendChild(deleteButton);
+    }
+
+    accountsList.appendChild(row);
+  });
+}
 
 const codesForm = document.getElementById("codes-form");
 const codesMessage = document.getElementById("codes-message");

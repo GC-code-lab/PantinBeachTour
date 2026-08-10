@@ -212,19 +212,9 @@ section {
   margin: 1.5rem 0;
 }
 
-.role-choice {
+.role-toggle {
   display: flex;
-  gap: 1rem;
-  margin-top: 0.65rem;
-}
-
-.role-choice label {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-weight: 600;
-  color: var(--color-text);
-  margin-top: 0;
+  gap: 0.5rem;
 }
 
 .account-bar {
@@ -545,8 +535,14 @@ section {
   flex: 1;
 }
 
-.team-row .badge {
+.team-row .badge,
+.team-row .role-toggle {
   flex: 0 0 auto;
+}
+
+.category-button:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .bulk-actions {
