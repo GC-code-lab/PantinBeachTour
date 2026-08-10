@@ -711,3 +711,63 @@ section {
 .site-footer a {
   color: white;
 }
+
+/* Mobile */
+
+@media (max-width: 640px) {
+  h1 {
+    font-size: 1.5rem;
+  }
+
+  .player-row {
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .match-row {
+    flex-wrap: wrap;
+  }
+
+  .match-team {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .match-teams {
+    flex: 1 1 100%;
+  }
+
+  .match-actions {
+    flex: 1 1 100%;
+    margin-left: 0;
+    justify-content: space-between;
+    flex-wrap: wrap;
+  }
+
+  .match-sets-inline {
+    flex-wrap: wrap;
+    row-gap: 0.5rem;
+  }
+
+  .team-row {
+    flex-wrap: wrap;
+  }
+
+  .team-row span {
+    flex: 1 1 100%;
+  }
+
+  .account-bar {
+    flex-wrap: wrap;
+  }
+
+  .bracket-scroller {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .podium {
+    gap: 0.5rem;
+  }
+}
