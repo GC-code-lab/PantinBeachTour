@@ -101,7 +101,32 @@ function computeCenters() {
   return centers;
 }
 
-function createMatchBox(match, teamsById, x, y) {
+// Croisements fixés par le format du tournoi (indépendants des résultats de poule,
+// donc connus dès le départ) — sert de texte de remplacement tant que l'équipe
+// réelle n'est pas encore connue (poules pas finies, ou tour précédent pas joué).
+const SLOT_PLACEHOLDERS = {
+  "barrage-1": ["2e Poule C", "3e Poule B"],
+  "barrage-2": ["2e Poule B", "3e Poule C"],
+  "barrage-3": ["2e Poule D", "3e Poule A"],
+  "barrage-4": ["2e Poule A", "3e Poule D"],
+  "qf-1": ["1er Poule A", "TBD"],
+  "qf-2": ["1er Poule D", "TBD"],
+  "qf-3": ["1er Poule B", "TBD"],
+  "qf-4": ["1er Poule C", "TBD"],
+  "sf-1": ["TBD", "TBD"],
+  "sf-2": ["TBD", "TBD"],
+  "finale": ["TBD", "TBD"],
+  "petite-finale": ["TBD", "TBD"],
+};
+
+function slotTeamLabel(match, teamsById, slot, index) {
+  const teamId = match ? (index === 0 ? match.team1_id : match.team2_id) : null;
+  if (teamId) return teamLabel(teamId, teamsById);
+  const placeholder = SLOT_PLACEHOLDERS[slot];
+  return placeholder ? placeholder[index] : "À déterminer";
+}
+
+function createMatchBox(match, teamsById, x, y, slot) {
   const box = document.createElement("div");
   box.className = "bracket-match";
   box.style.left = `${x}px`;
@@ -110,12 +135,12 @@ function createMatchBox(match, teamsById, x, y) {
 
   const team1 = document.createElement("div");
   team1.className = "bracket-team";
-  team1.textContent = teamLabel(match ? match.team1_id : null, teamsById);
+  team1.textContent = slotTeamLabel(match, teamsById, slot, 0);
   box.appendChild(team1);
 
   const team2 = document.createElement("div");
   team2.className = "bracket-team";
-  team2.textContent = teamLabel(match ? match.team2_id : null, teamsById);
+  team2.textContent = slotTeamLabel(match, teamsById, slot, 1);
   box.appendChild(team2);
 
   const sets = match && match.sets ? match.sets : [];
@@ -234,7 +259,7 @@ function renderBracket(teams, matches) {
     round.slots.forEach((slot) => {
       const y = centers[slot] - BOX_HEIGHT / 2;
       const match = matchBySlot.get(slot);
-      tree.appendChild(createMatchBox(match, teamsById, x, y));
+      tree.appendChild(createMatchBox(match, teamsById, x, y, slot));
     });
 
     if (i === ROUNDS.length - 1) return;
@@ -268,7 +293,7 @@ function renderBracket(teams, matches) {
   const finaleX = (ROUNDS.length - 1) * (BOX_WIDTH + COL_GAP);
   const finaleCenterY = centers[ROUNDS[3].slots[0]];
   const petiteFinaleY = finaleCenterY + BOX_HEIGHT / 2 + PETITE_FINALE_GAP;
-  tree.appendChild(createMatchBox(petiteFinale, teamsById, finaleX, petiteFinaleY));
+  tree.appendChild(createMatchBox(petiteFinale, teamsById, finaleX, petiteFinaleY, "petite-finale"));
 
   tree.appendChild(svg);
   scroller.appendChild(tree);
