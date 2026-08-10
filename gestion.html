@@ -58,6 +58,24 @@
           <span class="pool-card-chevron">▾</span>
         </button>
         <div id="roles-list" class="pool-card-content" hidden></div>
+
+        <h2>Codes d'inscription automatique</h2>
+        <p>Une personne qui rentre un de ces codes en créant son compte reçoit directement le rôle correspondant, sans que tu aies besoin de lui ajouter.</p>
+        <form id="codes-form" class="form">
+          <div class="player-row">
+            <div>
+              <label for="admin-code">Code Admin</label>
+              <input type="text" id="admin-code" name="admin-code">
+            </div>
+            <div>
+              <label for="scorer-code">Code Scorer</label>
+              <input type="text" id="scorer-code" name="scorer-code">
+            </div>
+          </div>
+
+          <button type="submit" class="button">Enregistrer les codes</button>
+        </form>
+        <p id="codes-message" class="form-message"></p>
       </section>
 
       <div class="account-bar">
@@ -163,6 +181,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js"></script>
   <script src="js/nav.js"></script>
-  <script src="js/gestion.js?v=33"></script>
+  <script src="js/gestion.js?v=34"></script>
 </body>
 </html>

@@ -44,7 +44,10 @@ function applyRoleUI(role) {
   poulesTabButton.hidden = !isAdmin;
   matchsTabButton.hidden = !hasAccess;
   rolesSection.hidden = !isAdmin;
-  if (isAdmin) loadAccountsWithoutRole();
+  if (isAdmin) {
+    loadAccountsWithoutRole();
+    loadSignupCodes();
+  }
 }
 
 // Page protégée : sans session, retour direct à l'écran de connexion.
@@ -155,6 +158,40 @@ rolesToggle.addEventListener("click", () => {
   rolesToggle.setAttribute("aria-expanded", String(!isOpen));
   rolesList.hidden = isOpen;
   if (!isOpen) loadRolesList();
+});
+
+const codesForm = document.getElementById("codes-form");
+const codesMessage = document.getElementById("codes-message");
+const adminCodeInput = document.getElementById("admin-code");
+const scorerCodeInput = document.getElementById("scorer-code");
+
+async function loadSignupCodes() {
+  const { data, error } = await supabaseClient.from("signup_codes").select("*");
+  if (error || !data) return;
+
+  const byRole = Object.fromEntries(data.map((row) => [row.role, row.code]));
+  adminCodeInput.value = byRole.admin || "";
+  scorerCodeInput.value = byRole.scorer || "";
+}
+
+codesForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const rows = [
+    { role: "admin", code: adminCodeInput.value.trim() },
+    { role: "scorer", code: scorerCodeInput.value.trim() },
+  ];
+
+  const { error } = await supabaseClient.from("signup_codes").upsert(rows);
+
+  if (error) {
+    codesMessage.textContent = "Erreur : " + error.message;
+    codesMessage.style.color = "var(--color-coral)";
+    return;
+  }
+
+  codesMessage.textContent = "Codes enregistrés.";
+  codesMessage.style.color = "var(--color-ocean-dark)";
 });
 
 const inscriptionForm = document.getElementById("inscription-form");
