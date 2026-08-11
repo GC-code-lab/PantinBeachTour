@@ -26,7 +26,7 @@ Pas de jargon inutile, juste les 3 briques à connaître :
 
 - **Le site lui-même** : des pages web (HTML/CSS/JavaScript) qui s'affichent dans le navigateur. Pas de logiciel à installer, juste un navigateur.
 - **La base de données (Supabase)** : un service en ligne qui stocke toutes les données (équipes, poules, matchs, scores, comptes). Le site va chercher/écrire les informations là-dedans à chaque action. Tu peux voir et modifier ces données directement depuis [supabase.com](https://supabase.com), dans le tableau de bord de ton projet, onglet **Table Editor** (pour voir les données) ou **SQL Editor** (pour lancer des requêtes).
-- **GitHub** : là où le code du site est sauvegardé (comme une sauvegarde + un historique de toutes les versions). Le dépôt s'appelle `PantinBeachTour`, sous le compte `GC-code-lab`.
+- **GitHub** : là où le code du site est sauvegardé (comme une sauvegarde + un historique de toutes les versions). Le dépôt s'appelle `PantinBeachTour`, sous le compte `GC-code-lab`. C'est aussi GitHub qui héberge le site en ligne (via **GitHub Pages**) : dès que tu envoies (`git push`) une modification, le site public se met à jour tout seul en quelques minutes, à cette adresse : **https://gc-code-lab.github.io/PantinBeachTour/**
 
 ---
 
@@ -41,6 +41,10 @@ Pas de jargon inutile, juste les 3 briques à connaître :
 
 Ces deux pages ont un sélecteur **Hommes / Femmes** en haut, pour basculer entre les deux catégories.
 
+**Avant même que les poules soient terminées**, le tableau des phases finales affiche déjà les croisements connus à l'avance (ex: "2e Poule C" contre "3e Poule B" pour un barrage, "1er Poule A" pour un quart) — ces croisements sont fixés par le format du tournoi, indépendamment des résultats. Le reste (ex: "vainqueur du quart 1") s'affiche juste comme "TBD" tant que ce n'est pas joué, pour ne pas surcharger l'affichage avec une évidence.
+
+Le site est pensé pour être consulté sur téléphone. Seule exception : le tableau des phases finales est volontairement large et pixel-exact (pour bien tracer les lignes de connexion) — sur un petit écran, il faut le faire défiler horizontalement avec le doigt pour tout voir, il commence toujours affiché depuis la gauche (les barrages).
+
 ### Partie admin (compte requis)
 
 | Page | Fichier | Rôle |
@@ -53,7 +57,9 @@ Ces deux pages ont un sélecteur **Hommes / Femmes** en haut, pour basculer entr
 ## 4. Les 4 onglets de "Gestion du tournoi"
 
 ### Onglet "Connexion"
-Affiche ton compte connecté, un bouton pour te déconnecter, et (si tu es admin) une section **"Ajout de rôle"** pour donner les droits admin ou scorer à un compte existant.
+Affiche ton compte connecté, un bouton pour te déconnecter, et (si tu es admin) deux sections :
+- **"Comptes"** : la liste de tous les comptes créés, avec leur rôle actuel et les boutons pour le changer (voir section 5).
+- **"Codes d'inscription automatique"** : deux codes (un pour Admin, un pour Scorer) que tu définis et modifies quand tu veux — voir section 5.
 
 ### Onglet "Inscription des équipes"
 Le formulaire pour inscrire une équipe : Nom/Prénom des deux joueurs (mis en forme automatiquement — Nom en MAJUSCULES, Prénom avec Majuscule initiale), et la catégorie (Hommes/Femmes). En dessous, la liste des équipes déjà inscrites, avec une case à cocher pour en supprimer plusieurs d'un coup.
@@ -76,21 +82,43 @@ Le formulaire pour inscrire une équipe : Nom/Prénom des deux joueurs (mis en f
 
 Il y a 3 niveaux :
 
-1. **Visiteur** (personne connectée) : peut seulement **regarder** les pages publiques (Poules, Phases finales). Ne peut rien modifier.
+1. **Visiteur** (personne connectée sans rôle, ou pas connectée du tout) : peut seulement **regarder** les pages publiques (Poules, Phases finales). Ne peut rien modifier. Un compte créé mais sans rôle voit exactement la même chose qu'un simple visiteur (juste l'onglet "Connexion" en plus, avec son email et un bouton pour se déconnecter).
 2. **Scorer** : en plus, peut **saisir les scores** des matchs (onglet "Matchs & Résultats" uniquement). Ne voit pas les onglets "Inscription" ni "Têtes de série & Poules".
-3. **Admin** : accès à tout — inscriptions, poules, scores, et peut donner des rôles à d'autres comptes.
+3. **Admin** : accès à tout — inscriptions, poules, scores, et peut gérer les rôles des autres comptes.
+
+### La liste "Comptes" (onglet Connexion)
+
+Tous les comptes créés apparaissent dans une seule liste, avec leur rôle actuel affiché directement ("Aucun rôle", "Scorer", ou "Admin") :
+
+- Pour un compte **sans rôle** ou **Scorer** : deux boutons "Scorer" / "Admin" à côté de son email. Clique sur l'un pour le lui attribuer.
+- Pour **retirer un rôle** à quelqu'un (le repasser à "sans rôle") : reclique sur le bouton de son rôle actuel (déjà en surbrillance) — un clic dessus l'enlève.
+- Pour un compte déjà **Admin** : plus de bouton, juste un badge "Admin" fixe. **Un admin ne peut pas rétrograder un autre admin** — c'est une protection volontaire (voir plus bas), pour éviter qu'un admin en dégrade un autre par erreur ou par malveillance.
 
 ### Comment ajouter quelqu'un (scorer ou admin)
 
-1. La personne va sur `admin.html`, clique **"Créer un compte"** (en dessous du formulaire de connexion), et crée son compte (email + mot de passe). À ce stade, elle n'a **aucun droit**, juste un compte qui existe.
-2. Toi (admin), tu vas dans "Gestion du tournoi" → onglet "Connexion" → section **"Ajout de rôle"** → tu choisis son email dans la liste déroulante (ne montre que les comptes sans rôle) → tu choisis "Scorer" ou "Admin" → "Ajouter le rôle".
-3. C'est fait, la personne peut se reconnecter et a maintenant les bons accès.
+1. La personne va sur `admin.html`, clique **"Créer un compte"** (en dessous du formulaire de connexion), et crée son compte (email + mot de passe). Un champ **"Code (optionnel)"** est proposé (voir plus bas) — si elle le laisse vide, elle n'a **aucun droit** au départ, juste un compte qui existe.
+2. Toi (admin), tu vas dans "Gestion du tournoi" → onglet "Connexion" → section **"Comptes"** → tu retrouves son email dans la liste → tu cliques "Scorer" ou "Admin".
+3. C'est fait, la personne a maintenant les bons accès (pas besoin de se reconnecter, ça s'applique tout de suite).
 
-Tu peux voir tous les comptes ayant un rôle en dépliant **"Comptes avec un rôle"**, juste en dessous du formulaire.
+### Les codes d'inscription automatique
+
+Pour éviter d'avoir à ajouter le rôle manuellement à chaque fois, tu peux définir deux codes secrets (un pour Admin, un pour Scorer) dans l'onglet Connexion, section **"Codes d'inscription automatique"**. Modifiable à tout moment.
+
+Une personne qui rentre le bon code dans le champ "Code" en créant son compte reçoit **automatiquement** le rôle correspondant, sans que tu aies besoin d'intervenir. Pratique pour donner le code "Scorer" aux personnes qui vont tenir les scores le jour J.
+
+### Le compte principal (toi, Gabriel) — "Propriétaire"
+
+Le compte `gabriel.cohen.1997@gmail.com` a un statut à part, codé en dur dans la base de données (pas un rôle comme les autres — voir `assign_role`/`remove_role`/`delete_account` dans le SQL Supabase si tu dois le retrouver un jour) :
+
+- Il s'affiche en haut de la liste "Comptes", avec un badge **"Propriétaire"** au lieu de "Admin", et personne (même toi) ne peut lui retirer ses droits admin via l'interface.
+- C'est le **seul** compte qui peut rétrograder un autre admin (les autres admins ne le peuvent pas entre eux).
+- C'est le **seul** compte qui voit un bouton **"Supprimer"** à côté de chaque compte (sauf le sien) — supprime définitivement le compte (email + mot de passe + rôle). Irréversible, avec une confirmation avant.
+
+Si un jour tu changes d'adresse email principale, il faut redemander à Claude de mettre à jour cette adresse dans les fonctions SQL correspondantes.
 
 ### Pourquoi c'est sécurisé
 
-Ce n'est pas juste une question d'affichage : la base de données elle-même vérifie le rôle avant d'autoriser une modification (via des "règles de sécurité" côté Supabase). Même si quelqu'un bidouillait le site, il ne pourrait pas écrire dans la base sans le bon rôle.
+Ce n'est pas juste une question d'affichage : la base de données elle-même vérifie le rôle (et l'identité du compte principal) avant d'autoriser une modification, directement dans les fonctions SQL (`assign_role`, `remove_role`, `delete_account`). Même si quelqu'un bidouillait le site, il ne pourrait ni changer un rôle sans être admin, ni rétrograder un admin sans être le compte principal, ni supprimer un compte du tout sauf en étant le compte principal.
 
 ---
 
@@ -103,6 +131,7 @@ Si tu vas dans Supabase → Table Editor, tu verras ces tables :
 - **`matches`** : tous les matchs — de poule, barrages, quarts, demies, petite finale, finale (une colonne `phase` dit lequel, une colonne `category` dit Hommes ou Femmes)
 - **`sets`** : les scores de chaque set joué, liés à un match
 - **`profiles`** : qui a quel rôle (admin/scorer) — lié aux comptes de connexion
+- **`signup_codes`** : les deux codes d'inscription automatique (admin/scorer), modifiables depuis l'onglet Connexion
 
 ---
 
@@ -140,7 +169,9 @@ git commit -m "Description de ce que tu as changé"
 git push
 ```
 
-⚠️ Le site n'est pour l'instant **pas encore mis en ligne publiquement** (pas de déploiement GitHub Pages fait) — il ne tourne qu'en local sur ta machine via `serve.py`. Pour le rendre accessible à tout le monde (joueurs, scorers) sans que chacun installe quoi que ce soit, il faudra activer GitHub Pages depuis les réglages du dépôt GitHub.
+✅ Le site est **en ligne** depuis GitHub Pages : **https://gc-code-lab.github.io/PantinBeachTour/**. Chaque `git push` sur la branche `main` republie automatiquement le site (compte quelques minutes de battement).
+
+⚠️ **Piège du cache navigateur** : contrairement à `serve.py` en local (qui désactive volontairement le cache), GitHub Pages, lui, laisse les navigateurs mettre les fichiers en cache normalement. Du coup, chaque fichier CSS/JS est chargé avec un numéro de version dans son adresse (ex : `style.css?v=32`, `gestion.js?v=39`) — **à chaque modification d'un de ces fichiers, il faut augmenter ce numéro d'un cran dans le(s) fichier(s) HTML qui le chargent**, sinon les visiteurs continuent de voir l'ancienne version pendant un moment. Si tu demandes une modification à Claude, c'est normalement fait automatiquement à chaque fois — mais si un changement ne semble "pas s'appliquer" en ligne, c'est le premier réflexe à vérifier.
 
 ---
 
@@ -149,4 +180,6 @@ git push
 - **"Une modification que Claude a faite ne s'affiche pas"** : recharge la page (le serveur local ne met rien en cache, donc un simple rechargement suffit).
 - **Erreur du style "column does not exist" ou "Could not find the function"** : ça veut presque toujours dire qu'une requête SQL donnée par Claude n'a pas encore été lancée dans le SQL Editor de Supabase.
 - **Un nouveau compte ne peut pas se connecter ("Email not confirmed")** : ça ne devrait plus arriver — un déclencheur automatique confirme chaque compte dès sa création. Si ça revient, redemande à Claude de vérifier le trigger `auto_confirm_email_trigger`.
+- **Une modification faite sur le site en ligne (pas en local) ne s'affiche pas** : voir l'encadré sur le cache dans la section 9 — il manque probablement un incrément du `?v=N` sur le fichier concerné.
+- **En lançant une requête SQL dans Supabase, erreur `unterminated dollar-quoted string`, avec des lignes `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` qui apparaissent toutes seules au milieu du code** : c'est un souci connu de l'éditeur SQL de Supabase — un outil d'auto-complétion ("Assistant") essaie d'ajouter automatiquement des sécurités RLS et se trompe sur les fonctions qui contiennent un bloc `declare`, cassant la requête. Solution : utiliser **SQL Editor → New query** (l'éditeur classique) plutôt qu'un assistant/chat qui génère et exécute du SQL, et coller le bloc SQL donné tel quel.
 - **Tu ne te souviens plus de rien** : montre ce fichier à Claude en début de conversation, ça remet tout en contexte instantanément.
