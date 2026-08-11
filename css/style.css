@@ -507,6 +507,10 @@ section {
 }
 
 .seed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -524,6 +528,33 @@ section {
 
 .seed-item.dragging {
   opacity: 0.4;
+}
+
+.seed-controls {
+  display: flex;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+}
+
+.seed-move-button {
+  width: 2rem;
+  height: 2rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.seed-move-button:not(:disabled):hover {
+  border-color: var(--color-ocean);
+  color: var(--color-ocean);
+}
+
+.seed-move-button:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .generate-buttons {

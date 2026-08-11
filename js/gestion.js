@@ -496,7 +496,16 @@ function renderPools(pools, teams) {
   });
 }
 
-// Classement par glisser-déposer : seedTeams[0] = tête de série n°1, etc.
+function moveSeed(fromIndex, toIndex) {
+  const [moved] = seedTeams.splice(fromIndex, 1);
+  seedTeams.splice(toIndex, 0, moved);
+  renderSeedingList();
+  saveSeedOrder();
+}
+
+// Classement : seedTeams[0] = tête de série n°1, etc. Réordonnable au glisser-déposer
+// (souris, desktop) ou aux boutons ▲▼ (le drag-and-drop HTML5 ne marche quasiment
+// jamais au toucher sur mobile — Safari iOS notamment ne le supporte pas du tout).
 function renderSeedingList() {
   seedingList.innerHTML = "";
 
@@ -505,7 +514,31 @@ function renderSeedingList() {
     item.className = "seed-item";
     item.draggable = true;
     item.dataset.index = index;
-    item.textContent = formatTeamDetail(team);
+
+    const label = document.createElement("span");
+    label.textContent = formatTeamDetail(team);
+    item.appendChild(label);
+
+    const controls = document.createElement("div");
+    controls.className = "seed-controls";
+
+    const upButton = document.createElement("button");
+    upButton.type = "button";
+    upButton.className = "seed-move-button";
+    upButton.textContent = "▲";
+    upButton.disabled = index === 0;
+    upButton.addEventListener("click", () => moveSeed(index, index - 1));
+    controls.appendChild(upButton);
+
+    const downButton = document.createElement("button");
+    downButton.type = "button";
+    downButton.className = "seed-move-button";
+    downButton.textContent = "▼";
+    downButton.disabled = index === seedTeams.length - 1;
+    downButton.addEventListener("click", () => moveSeed(index, index + 1));
+    controls.appendChild(downButton);
+
+    item.appendChild(controls);
 
     item.addEventListener("dragstart", () => {
       item.classList.add("dragging");
@@ -523,10 +556,7 @@ function renderSeedingList() {
       event.preventDefault();
       const fromIndex = Number(seedingList.querySelector(".dragging").dataset.index);
       const toIndex = Number(item.dataset.index);
-      const [moved] = seedTeams.splice(fromIndex, 1);
-      seedTeams.splice(toIndex, 0, moved);
-      renderSeedingList();
-      saveSeedOrder();
+      moveSeed(fromIndex, toIndex);
     });
 
     seedingList.appendChild(item);
