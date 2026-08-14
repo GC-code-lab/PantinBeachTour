@@ -434,8 +434,8 @@ let allTeams = [];
 
 // Tant qu'aucun classement manuel n'a encore été fait pour la catégorie (tous les
 // teams.seed sont null), l'ordre par défaut des têtes de série vient des points
-// (somme des deux joueurs, décroissant). Dès qu'un classement manuel existe, on le
-// respecte tel quel (nouvelles équipes ajoutées en dernier, à ajuster à la main).
+// de la paire (décroissant). Dès qu'un classement manuel existe, on le respecte
+// tel quel (nouvelles équipes ajoutées en dernier, à ajuster à la main).
 function defaultSeedOrder(teams) {
   const hasManualSeed = teams.some((team) => team.seed != null);
   if (hasManualSeed) return teams;
