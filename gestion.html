@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestion du tournoi — Pantin Beach Tour</title>
-  <link rel="stylesheet" href="css/style.css?v=33">
+  <link rel="stylesheet" href="css/style.css?v=35">
 </head>
 <body>
   <header class="site-header">
@@ -90,9 +90,47 @@
             </div>
           </div>
 
+          <div class="player-row">
+            <div>
+              <label for="team-points">Points de la paire</label>
+              <input type="number" id="team-points" name="team-points" min="0">
+            </div>
+          </div>
+
           <button type="submit" class="button">Inscrire l'équipe</button>
         </form>
         <p id="inscription-message" class="form-message"></p>
+      </section>
+
+      <section>
+        <button type="button" id="import-toggle" class="pool-card-header" aria-expanded="false">
+          <span>Importer plusieurs équipes</span>
+          <span class="pool-card-chevron">▾</span>
+        </button>
+
+        <div id="import-content" class="pool-card-content" hidden>
+          <p>Colle une capture d'écran du tableau de classement dans un chat IA, avec ce message :</p>
+          <div class="import-prompt-row">
+            <p id="import-prompt-text" class="import-prompt"></p>
+            <button type="button" id="import-copy-button" class="button button-sm">Copier</button>
+          </div>
+          <p>Colle ensuite la réponse ci-dessous — elle s'applique à la catégorie sélectionnée en haut (<span id="import-category-label"></span>).</p>
+
+          <textarea id="import-json-input" rows="6" placeholder='[{"player1_nom":"DUPONT","player1_prenom":"Jean","player2_nom":"MARTIN","player2_prenom":"Paul","points":120}, ...]'></textarea>
+          <div class="generate-buttons">
+            <button id="import-preview-button" type="button" class="button">Prévisualiser</button>
+          </div>
+          <p id="import-message" class="form-message"></p>
+
+          <div id="import-preview" hidden>
+            <h3>Aperçu (<span id="import-preview-count"></span> équipes)</h3>
+            <div id="import-preview-list"></div>
+            <div class="generate-buttons">
+              <button id="import-confirm-button" type="button" class="button">Confirmer l'import</button>
+              <button id="import-cancel-button" type="button" class="button button-danger">Annuler</button>
+            </div>
+          </div>
+        </div>
       </section>
 
       <section>
@@ -157,6 +195,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js"></script>
   <script src="js/nav.js"></script>
-  <script src="js/gestion.js?v=40"></script>
+  <script src="js/gestion.js?v=46"></script>
 </body>
 </html>

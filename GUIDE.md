@@ -62,12 +62,14 @@ Affiche ton compte connecté, un bouton pour te déconnecter, et (si tu es admin
 - **"Codes d'inscription automatique"** : deux codes (un pour Admin, un pour Scorer) que tu définis et modifies quand tu veux — voir section 5.
 
 ### Onglet "Inscription des équipes"
-Le formulaire pour inscrire une équipe : Nom/Prénom des deux joueurs (mis en forme automatiquement — Nom en MAJUSCULES, Prénom avec Majuscule initiale), et la catégorie (Hommes/Femmes). En dessous, la liste des équipes déjà inscrites, avec une case à cocher pour en supprimer plusieurs d'un coup.
+Le formulaire pour inscrire une équipe : Nom/Prénom des deux joueurs (Nom mis en MAJUSCULES, Prénom avec Majuscule initiale, automatiquement), la catégorie (Hommes/Femmes), et les **points de la paire** (un seul nombre pour l'équipe, pas par joueur — son classement de référence). En dessous, la liste des équipes déjà inscrites — **triée par points décroissants**, avec le nombre de points affiché à côté de chaque équipe — et une case à cocher pour en supprimer plusieurs d'un coup.
 
 ⚠️ Le nom d'équipe (ex: "DUPONT/MARTIN") est calculé automatiquement à partir des noms de famille des deux joueurs — pas besoin de le taper.
 
+**Import en masse** : pour éviter de retaper les 12/16 équipes à la main, une section repliable "Importer plusieurs équipes" permet de coller un JSON généré en demandant à un chat IA (ChatGPT, Claude, Gemini...) de lire une capture d'écran du tableau de classement — un bouton "Copier" à côté du message à envoyer évite de le retaper. Le JSON est d'abord **prévisualisé** (pour corriger une erreur de lecture éventuelle) avant d'être importé d'un coup dans la catégorie sélectionnée. Aucune clé API ni configuration supplémentaire n'est nécessaire — c'est un simple copier-coller.
+
 ### Onglet "Têtes de série & Poules"
-1. Une liste des équipes de la catégorie sélectionnée, que tu classes en les faisant **glisser** (la position 1 = tête de série n°1), ou avec les boutons **▲/▼** à côté de chaque équipe (plus pratique sur téléphone, où le glisser-déposer ne fonctionne pas toujours). Ce classement est sauvegardé automatiquement à chaque changement. Tu peux réordonner à tout moment, même après avoir déjà généré les poules — reclique juste sur "Générer 4 poules" ensuite pour les recalculer avec le nouvel ordre (⚠️ ça réinitialise les matchs et scores déjà saisis pour cette catégorie).
+1. Une liste des équipes de la catégorie sélectionnée. **Tant qu'aucun classement manuel n'a été fait**, l'ordre par défaut est calculé automatiquement à partir des points de la paire (décroissant). Tu peux ensuite l'ajuster en faisant **glisser** une équipe, ou avec les boutons **▲/▼** à côté de chaque équipe (plus pratique sur téléphone, où le glisser-déposer ne fonctionne pas toujours) — utile pour départager une égalité de points ou un cas particulier le jour J. Dès que tu fais un seul ajustement manuel, ce classement est sauvegardé et devient la référence (nouvelles équipes ajoutées en bas de liste, à repositionner à la main). Tu peux réordonner à tout moment, même après avoir déjà généré les poules — reclique juste sur "Générer 4 poules" ensuite pour les recalculer avec le nouvel ordre (⚠️ ça réinitialise les matchs et scores déjà saisis pour cette catégorie).
 2. Un bouton **"Générer 4 poules de 3"** (pour 12 équipes) ou **"Générer 4 poules de 4"** (pour 16 équipes) — apparaît seulement si le nombre d'équipes correspond. Ce bouton fait tout d'un coup : il crée les 4 poules et répartit les équipes dedans en **méthode serpentin** (voir section 7), puis génère aussi les matchs de chaque poule.
 
 ### Onglet "Matchs & Résultats"
@@ -126,7 +128,7 @@ Ce n'est pas juste une question d'affichage : la base de données elle-même vé
 
 Si tu vas dans Supabase → Table Editor, tu verras ces tables :
 
-- **`teams`** : les équipes inscrites (noms des joueurs, catégorie, poule assignée, classement tête de série)
+- **`teams`** : les équipes inscrites (noms des joueurs, points de classement de la paire, catégorie, poule assignée, classement tête de série)
 - **`pools`** : les 4 poules (A/B/C/D) par catégorie
 - **`matches`** : tous les matchs — de poule, barrages, quarts, demies, petite finale, finale (une colonne `phase` dit lequel, une colonne `category` dit Hommes ou Femmes)
 - **`sets`** : les scores de chaque set joué, liés à un match
@@ -186,10 +188,6 @@ git push
 
 ---
 
-## 11. Chantier en cours (pas encore fait)
+## 11. Historique des décisions
 
-**Import du classement PVS** : idée d'un bouton, au niveau des têtes de série, pour récupérer automatiquement le classement des équipes depuis PVS (`pvs.sandsystem.com`) au lieu de le retaper à la main. Exploré le 11/08/2026, pas encore codé.
-
-- Un import 100% automatique n'est pas raisonnable : PVS n'a pas de mot de passe (connexion uniquement par Google ou lien magique par email), donc un serveur ne peut pas "se connecter à ta place" de façon fiable.
-- Solution retenue : un **bookmarklet** (petit favori spécial, voir la conversation du 11/08/2026 si besoin de ré-expliquer le concept) que tu cliques une fois connecté sur la page PVS — il lit le tableau affiché et le copie dans ton presse-papier ; tu reviens sur notre site et tu colles dans une zone dédiée à créer, qui fera la correspondance avec les équipes inscrites.
-- Bloqué en attendant une capture d'écran du tableau des têtes de série sur PVS (une fois connecté) pour écrire le code qui le lit correctement.
+**Import du classement des équipes** (14/08/2026) : plutôt qu'un bouton "connecté à PVS" (pas raisonnable — PVS n'a pas de mot de passe classique, connexion uniquement par Google/lien magique, donc un serveur ne peut pas s'y connecter à ta place) ou qu'une intégration API Claude avec clé secrète (backend à maintenir pour un usage 1x/tournoi, disproportionné), la solution retenue est un **copier-coller de JSON** : tu demandes à un chat IA de ton choix de lire la capture d'écran et de te sortir un JSON, tu le colles dans la section "Importer plusieurs équipes" de l'onglet Inscription (voir section 4). Zéro clé API, zéro backend à maintenir.

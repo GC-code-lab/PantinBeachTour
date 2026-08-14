@@ -256,6 +256,7 @@ inscriptionForm.addEventListener("submit", async (event) => {
   const player1Prenom = document.getElementById("player1-prenom").value;
   const player2Nom = document.getElementById("player2-nom").value;
   const player2Prenom = document.getElementById("player2-prenom").value;
+  const teamPointsValue = document.getElementById("team-points").value;
 
   const team = {
     category,
@@ -264,6 +265,7 @@ inscriptionForm.addEventListener("submit", async (event) => {
     player1_prenom: player1Prenom,
     player2_nom: player2Nom,
     player2_prenom: player2Prenom,
+    points: Number(teamPointsValue),
   };
 
   const { error } = await supabaseClient.from("teams").insert(team);
@@ -284,6 +286,137 @@ function formatTeamDetail(team) {
   return `${team.player1_prenom} ${team.player1_nom} / ${team.player2_prenom} ${team.player2_nom}`;
 }
 
+function teamPoints(team) {
+  return Number(team.points || 0);
+}
+
+function formatTeamDetailWithPoints(team) {
+  return `${formatTeamDetail(team)} — ${teamPoints(team)} pts`;
+}
+
+// Import en masse : l'admin colle un JSON (obtenu en demandant à un chat IA de lire
+// une capture d'écran du tableau de classement) plutôt que de retaper équipe par
+// équipe. On prévisualise avant d'écrire en base, pour pouvoir corriger une erreur
+// de lecture (nom coupé, points mal lus) avant confirmation.
+const importToggle = document.getElementById("import-toggle");
+const importContent = document.getElementById("import-content");
+
+importToggle.addEventListener("click", () => {
+  const isOpen = importToggle.getAttribute("aria-expanded") === "true";
+  importToggle.setAttribute("aria-expanded", String(!isOpen));
+  importContent.hidden = isOpen;
+});
+
+const IMPORT_PROMPT_TEXT =
+  'Extrais chaque équipe de ce tableau (2 joueurs par équipe) en JSON, format : ' +
+  '[{"player1_nom":"...", "player1_prenom":"...", "player2_nom":"...", "player2_prenom":"...", "points":...}, ...]. ' +
+  "Un objet par équipe. Pour \"points\", utilise les points TECHNIQUE (pas les points d'inscription — " +
+  "s'il y a deux colonnes de points dans le tableau, prends bien la colonne \"technique\"). " +
+  "Réponds uniquement avec le JSON, rien d'autre.";
+
+const importPromptText = document.getElementById("import-prompt-text");
+const importCopyButton = document.getElementById("import-copy-button");
+importPromptText.textContent = IMPORT_PROMPT_TEXT;
+
+importCopyButton.addEventListener("click", async () => {
+  await navigator.clipboard.writeText(IMPORT_PROMPT_TEXT);
+  const original = importCopyButton.textContent;
+  importCopyButton.textContent = "Copié !";
+  setTimeout(() => {
+    importCopyButton.textContent = original;
+  }, 1500);
+});
+
+const importJsonInput = document.getElementById("import-json-input");
+const importPreviewButton = document.getElementById("import-preview-button");
+const importMessage = document.getElementById("import-message");
+const importPreview = document.getElementById("import-preview");
+const importPreviewCount = document.getElementById("import-preview-count");
+const importPreviewList = document.getElementById("import-preview-list");
+const importConfirmButton = document.getElementById("import-confirm-button");
+const importCancelButton = document.getElementById("import-cancel-button");
+const importCategoryLabel = document.getElementById("import-category-label");
+
+let pendingImportTeams = [];
+
+function resetImportPreview() {
+  pendingImportTeams = [];
+  importPreview.hidden = true;
+  importPreviewList.innerHTML = "";
+}
+
+importPreviewButton.addEventListener("click", () => {
+  resetImportPreview();
+  importMessage.textContent = "";
+
+  let parsed;
+  try {
+    parsed = JSON.parse(importJsonInput.value);
+  } catch (e) {
+    importMessage.textContent = "JSON invalide — vérifie que tu as bien collé la réponse complète.";
+    importMessage.style.color = "var(--color-coral)";
+    return;
+  }
+
+  if (!Array.isArray(parsed) || parsed.length === 0) {
+    importMessage.textContent = "Le JSON doit être une liste d'équipes non vide.";
+    importMessage.style.color = "var(--color-coral)";
+    return;
+  }
+
+  const requiredFields = ["player1_nom", "player1_prenom", "player2_nom", "player2_prenom"];
+  const missingFieldRow = parsed.findIndex(
+    (row) => !requiredFields.every((field) => typeof row[field] === "string" && row[field].trim() !== "")
+  );
+  if (missingFieldRow !== -1) {
+    importMessage.textContent = `Équipe n°${missingFieldRow + 1} : nom ou prénom manquant dans le JSON.`;
+    importMessage.style.color = "var(--color-coral)";
+    return;
+  }
+
+  pendingImportTeams = parsed.map((row) => ({
+    category: currentCategory,
+    name: `${toUpper(row.player1_nom)}/${toUpper(row.player2_nom)}`,
+    player1_nom: toUpper(row.player1_nom),
+    player1_prenom: toCapitalized(row.player1_prenom),
+    player2_nom: toUpper(row.player2_nom),
+    player2_prenom: toCapitalized(row.player2_prenom),
+    points: Number(row.points) || 0,
+  }));
+
+  importPreviewCount.textContent = pendingImportTeams.length;
+  pendingImportTeams.forEach((team) => {
+    const row = document.createElement("div");
+    row.className = "team-row";
+    const label = document.createElement("span");
+    label.textContent = formatTeamDetailWithPoints(team);
+    row.appendChild(label);
+    importPreviewList.appendChild(row);
+  });
+  importPreview.hidden = false;
+});
+
+importCancelButton.addEventListener("click", () => {
+  resetImportPreview();
+  importMessage.textContent = "";
+});
+
+importConfirmButton.addEventListener("click", async () => {
+  const { error } = await supabaseClient.from("teams").insert(pendingImportTeams);
+
+  if (error) {
+    importMessage.textContent = "Erreur : " + error.message;
+    importMessage.style.color = "var(--color-coral)";
+    return;
+  }
+
+  importMessage.textContent = `${pendingImportTeams.length} équipes importées !`;
+  importMessage.style.color = "var(--color-ocean-dark)";
+  importJsonInput.value = "";
+  resetImportPreview();
+  loadAdminData();
+});
+
 const poolsList = document.getElementById("pools-list");
 const teamsList = document.getElementById("teams-list");
 const teamsCount = document.getElementById("teams-count");
@@ -299,6 +432,21 @@ const generateMessage = document.getElementById("generate-message");
 let seedTeams = [];
 let allTeams = [];
 
+// Tant qu'aucun classement manuel n'a encore été fait pour la catégorie (tous les
+// teams.seed sont null), l'ordre par défaut des têtes de série vient des points
+// (somme des deux joueurs, décroissant). Dès qu'un classement manuel existe, on le
+// respecte tel quel (nouvelles équipes ajoutées en dernier, à ajuster à la main).
+function defaultSeedOrder(teams) {
+  const hasManualSeed = teams.some((team) => team.seed != null);
+  if (hasManualSeed) return teams;
+
+  return teams.slice().sort((a, b) => {
+    const diff = teamPoints(b) - teamPoints(a);
+    if (diff !== 0) return diff;
+    return new Date(a.created_at) - new Date(b.created_at);
+  });
+}
+
 // Le classement (glisser-déposer) est persisté en base dans teams.seed,
 // donc il survit aux rechargements. Nouvelles équipes (seed = null) en dernier.
 async function saveSeedOrder() {
@@ -310,6 +458,8 @@ async function saveSeedOrder() {
 }
 
 async function loadAdminData() {
+  importCategoryLabel.textContent = currentCategory;
+
   const { data: pools, error: poolsError } = await supabaseClient
     .from("pools")
     .select("*")
@@ -350,7 +500,7 @@ async function loadAdminData() {
   renderGenerateControls(categoryTeams.length);
   renderMatchesTab(categoryPools, categoryTeams, categoryMatches);
   renderBracketTab(categoryPools, categoryTeams, categoryMatches, categoryBracketMatches);
-  seedTeams = categoryTeams;
+  seedTeams = defaultSeedOrder(categoryTeams);
   renderSeedingList();
 }
 
@@ -392,7 +542,9 @@ function renderTeamsList(teams) {
     return;
   }
 
-  teams.forEach((team) => {
+  const sortedTeams = teams.slice().sort((a, b) => teamPoints(b) - teamPoints(a));
+
+  sortedTeams.forEach((team) => {
     const row = document.createElement("div");
     row.className = "team-row";
 
@@ -409,7 +561,7 @@ function renderTeamsList(teams) {
     row.appendChild(checkbox);
 
     const label = document.createElement("span");
-    label.textContent = formatTeamDetail(team);
+    label.textContent = formatTeamDetailWithPoints(team);
     row.appendChild(label);
 
     const deleteButton = document.createElement("button");
@@ -516,7 +668,7 @@ function renderSeedingList() {
     item.dataset.index = index;
 
     const label = document.createElement("span");
-    label.textContent = formatTeamDetail(team);
+    label.textContent = formatTeamDetailWithPoints(team);
     item.appendChild(label);
 
     const controls = document.createElement("div");
