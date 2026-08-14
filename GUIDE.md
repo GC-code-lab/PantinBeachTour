@@ -67,7 +67,7 @@ Le formulaire pour inscrire une équipe : Nom/Prénom des deux joueurs (mis en f
 ⚠️ Le nom d'équipe (ex: "DUPONT/MARTIN") est calculé automatiquement à partir des noms de famille des deux joueurs — pas besoin de le taper.
 
 ### Onglet "Têtes de série & Poules"
-1. Une liste des équipes de la catégorie sélectionnée, que tu classes en les faisant **glisser** (la position 1 = tête de série n°1). Ce classement est sauvegardé automatiquement à chaque glissement.
+1. Une liste des équipes de la catégorie sélectionnée, que tu classes en les faisant **glisser** (la position 1 = tête de série n°1), ou avec les boutons **▲/▼** à côté de chaque équipe (plus pratique sur téléphone, où le glisser-déposer ne fonctionne pas toujours). Ce classement est sauvegardé automatiquement à chaque changement. Tu peux réordonner à tout moment, même après avoir déjà généré les poules — reclique juste sur "Générer 4 poules" ensuite pour les recalculer avec le nouvel ordre (⚠️ ça réinitialise les matchs et scores déjà saisis pour cette catégorie).
 2. Un bouton **"Générer 4 poules de 3"** (pour 12 équipes) ou **"Générer 4 poules de 4"** (pour 16 équipes) — apparaît seulement si le nombre d'équipes correspond. Ce bouton fait tout d'un coup : il crée les 4 poules et répartit les équipes dedans en **méthode serpentin** (voir section 7), puis génère aussi les matchs de chaque poule.
 
 ### Onglet "Matchs & Résultats"
@@ -171,7 +171,7 @@ git push
 
 ✅ Le site est **en ligne** depuis GitHub Pages : **https://gc-code-lab.github.io/PantinBeachTour/**. Chaque `git push` sur la branche `main` republie automatiquement le site (compte quelques minutes de battement).
 
-⚠️ **Piège du cache navigateur** : contrairement à `serve.py` en local (qui désactive volontairement le cache), GitHub Pages, lui, laisse les navigateurs mettre les fichiers en cache normalement. Du coup, chaque fichier CSS/JS est chargé avec un numéro de version dans son adresse (ex : `style.css?v=32`, `gestion.js?v=39`) — **à chaque modification d'un de ces fichiers, il faut augmenter ce numéro d'un cran dans le(s) fichier(s) HTML qui le chargent**, sinon les visiteurs continuent de voir l'ancienne version pendant un moment. Si tu demandes une modification à Claude, c'est normalement fait automatiquement à chaque fois — mais si un changement ne semble "pas s'appliquer" en ligne, c'est le premier réflexe à vérifier.
+⚠️ **Piège du cache navigateur** : contrairement à `serve.py` en local (qui désactive volontairement le cache), GitHub Pages, lui, laisse les navigateurs mettre les fichiers en cache normalement. Du coup, chaque fichier CSS/JS est chargé avec un numéro de version dans son adresse (ex : `style.css?v=33`, `gestion.js?v=40`) — **à chaque modification d'un de ces fichiers, il faut augmenter ce numéro d'un cran dans le(s) fichier(s) HTML qui le chargent**, sinon les visiteurs continuent de voir l'ancienne version pendant un moment. Si tu demandes une modification à Claude, c'est normalement fait automatiquement à chaque fois — mais si un changement ne semble "pas s'appliquer" en ligne, c'est le premier réflexe à vérifier.
 
 ---
 
@@ -183,3 +183,13 @@ git push
 - **Une modification faite sur le site en ligne (pas en local) ne s'affiche pas** : voir l'encadré sur le cache dans la section 9 — il manque probablement un incrément du `?v=N` sur le fichier concerné.
 - **En lançant une requête SQL dans Supabase, erreur `unterminated dollar-quoted string`, avec des lignes `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` qui apparaissent toutes seules au milieu du code** : c'est un souci connu de l'éditeur SQL de Supabase — un outil d'auto-complétion ("Assistant") essaie d'ajouter automatiquement des sécurités RLS et se trompe sur les fonctions qui contiennent un bloc `declare`, cassant la requête. Solution : utiliser **SQL Editor → New query** (l'éditeur classique) plutôt qu'un assistant/chat qui génère et exécute du SQL, et coller le bloc SQL donné tel quel.
 - **Tu ne te souviens plus de rien** : montre ce fichier à Claude en début de conversation, ça remet tout en contexte instantanément.
+
+---
+
+## 11. Chantier en cours (pas encore fait)
+
+**Import du classement PVS** : idée d'un bouton, au niveau des têtes de série, pour récupérer automatiquement le classement des équipes depuis PVS (`pvs.sandsystem.com`) au lieu de le retaper à la main. Exploré le 11/08/2026, pas encore codé.
+
+- Un import 100% automatique n'est pas raisonnable : PVS n'a pas de mot de passe (connexion uniquement par Google ou lien magique par email), donc un serveur ne peut pas "se connecter à ta place" de façon fiable.
+- Solution retenue : un **bookmarklet** (petit favori spécial, voir la conversation du 11/08/2026 si besoin de ré-expliquer le concept) que tu cliques une fois connecté sur la page PVS — il lit le tableau affiché et le copie dans ton presse-papier ; tu reviens sur notre site et tu colles dans une zone dédiée à créer, qui fera la correspondance avec les équipes inscrites.
+- Bloqué en attendant une capture d'écran du tableau des têtes de série sur PVS (une fois connecté) pour écrire le code qui le lit correctement.
