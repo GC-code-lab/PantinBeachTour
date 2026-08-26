@@ -59,6 +59,10 @@ body {
   justify-content: center;
 }
 
+.courts-main {
+  max-width: 1400px;
+}
+
 h1, h2, h3 {
   color: var(--color-text);
   line-height: 1.2;
@@ -465,7 +469,7 @@ section {
 /* Admin */
 
 #pools-list,
-#courts-list {
+.courts-list {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
@@ -479,7 +483,7 @@ section {
 
 @media (max-width: 600px) {
   #pools-list,
-  #courts-list {
+  .courts-list {
     grid-template-columns: 1fr;
   }
 }
