@@ -10,6 +10,7 @@
   --color-text-muted: #64748b;
   --color-danger: #b5544f;
   --color-danger-dark: #9c433f;
+  --color-success: #2a9d5c;
   --radius: 10px;
   --radius-pill: 999px;
   --spacing: 1rem;
@@ -338,6 +339,42 @@ section {
   margin-bottom: 0.5rem;
 }
 
+.match-row.match-row-done {
+  border-left-color: var(--color-success);
+}
+
+.standings-table-wrapper {
+  overflow-x: auto;
+}
+
+.standings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+.standings-table th,
+.standings-table td {
+  padding: 0.5rem 0.6rem;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+
+.standings-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+
+.standings-table tbody tr:first-child {
+  font-weight: 700;
+}
+
+.standings-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .match-team {
   flex: 1;
   font-weight: 600;
@@ -427,7 +464,8 @@ section {
 
 /* Admin */
 
-#pools-list {
+#pools-list,
+#courts-list {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
@@ -440,9 +478,18 @@ section {
 }
 
 @media (max-width: 600px) {
-  #pools-list {
+  #pools-list,
+  #courts-list {
     grid-template-columns: 1fr;
   }
+}
+
+.match-order-tag {
+  flex: 0 0 auto;
+  min-width: 70px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
 }
 
 .pool-card {
@@ -498,6 +545,14 @@ section {
 
 .pool-card-content {
   margin-top: 0.75rem;
+}
+
+.pool-card-section {
+  margin-top: 0.75rem;
+}
+
+.pool-card-section:first-child {
+  margin-top: 0;
 }
 
 .seeding-list {

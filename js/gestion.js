@@ -844,6 +844,27 @@ function requiredSetWins(phase) {
   return phase === "poule" ? 1 : 2;
 }
 
+// Points à atteindre pour gagner un set donné, selon la phase (règles du tournoi,
+// voir section 7 du GUIDE.md) : poule = 21 ; barrage = 15 (tie-break 11) ;
+// quart/demi/petite finale/finale = 21 (tie-break 15).
+function setTargetPoints(phase, setNumber) {
+  if (phase === "poule") return 21;
+  if (phase === "barrage") return setNumber === 3 ? 11 : 15;
+  return setNumber === 3 ? 15 : 21;
+}
+
+// Un set est gagné dès que le vainqueur atteint la cible ET mène par au moins 2 points.
+// Au-delà de la cible (prolongation), le score final ne peut être qu'exactement +2
+// (le set s'arrête à la première occasion où l'écart de 2 points est atteint).
+function isValidSetScore(target, score1, score2) {
+  const winner = Math.max(score1, score2);
+  const loser = Math.min(score1, score2);
+  if (winner < target) return false;
+  if (winner - loser < 2) return false;
+  if (winner > target && winner - loser !== 2) return false;
+  return true;
+}
+
 // Enregistre les sets saisis (les sets laissés vides sont ignorés), détermine si le match
 // est terminé (une équipe a atteint le nombre de sets gagnants requis) et, si oui, propage
 // le vainqueur — et pour les demies, aussi le perdant — dans le match suivant du tableau.
@@ -924,11 +945,14 @@ function buildScorePair(matchId, setNumber, existing) {
   const draftKey = `${matchId}-${setNumber}`;
   const draft = draftScores.get(draftKey);
 
+  // Le brouillon (ce que l'utilisateur vient de taper) doit primer sur la valeur
+  // déjà enregistrée : sinon, corriger le score d'un match déjà noté se fait
+  // écraser par l'ancienne valeur dès qu'un autre match est enregistré à côté.
   const input1 = document.createElement("input");
   input1.type = "number";
   input1.min = "0";
-  if (existing) input1.value = existing.score_team1;
-  else if (draft) input1.value = draft.score1;
+  if (draft) input1.value = draft.score1;
+  else if (existing) input1.value = existing.score_team1;
 
   const separator = document.createElement("span");
   separator.textContent = "-";
@@ -936,8 +960,8 @@ function buildScorePair(matchId, setNumber, existing) {
   const input2 = document.createElement("input");
   input2.type = "number";
   input2.min = "0";
-  if (existing) input2.value = existing.score_team2;
-  else if (draft) input2.value = draft.score2;
+  if (draft) input2.value = draft.score2;
+  else if (existing) input2.value = existing.score_team2;
 
   const saveDraft = () => {
     draftScores.set(draftKey, { score1: input1.value, score2: input2.value });
@@ -963,7 +987,7 @@ function setWinner(input1, input2) {
 
 // Lit les champs remplis (les sets laissés vides sont ignorés) et valide les scores.
 // Retourne null (avec une alerte) si la saisie est invalide.
-function collectEnteredSets(setInputs) {
+function collectEnteredSets(setInputs, phase) {
   const enteredSets = [];
   for (const { setNumber, input1, input2 } of setInputs) {
     if (input1.value === "" && input2.value === "") continue;
@@ -971,6 +995,11 @@ function collectEnteredSets(setInputs) {
     const score2 = Number(input2.value);
     if (!Number.isInteger(score1) || !Number.isInteger(score2) || score1 < 0 || score2 < 0 || score1 === score2) {
       alert("Merci d'entrer un score valide (et différent) pour les deux équipes.");
+      return null;
+    }
+    const target = setTargetPoints(phase, setNumber);
+    if (!isValidSetScore(target, score1, score2)) {
+      alert(`Score invalide pour le set ${setNumber} : il faut ${target} points et 2 points d'écart minimum.`);
       return null;
     }
     enteredSets.push({ setNumber, score1, score2 });
@@ -994,7 +1023,7 @@ function createMatchRow(match, teamsById) {
   const setInputs = [];
 
   const row = document.createElement("div");
-  row.className = "match-row";
+  row.className = match.status === "termine" ? "match-row match-row-done" : "match-row";
 
   const team1Span = document.createElement("span");
   team1Span.className = "match-team";
@@ -1077,7 +1106,7 @@ function createMatchRow(match, teamsById) {
     saveButton.className = "button button-sm";
     saveButton.textContent = "Enregistrer";
     saveButton.addEventListener("click", () => {
-      const enteredSets = collectEnteredSets(setInputs);
+      const enteredSets = collectEnteredSets(setInputs, match.phase);
       if (enteredSets) saveMatchSets(match, enteredSets);
     });
     actions.appendChild(saveButton);
@@ -1090,14 +1119,21 @@ function createMatchRow(match, teamsById) {
 
 // Un groupe de matchs repliable (poule, ou tour du tableau final) : replié par
 // défaut, avec juste le titre + une flèche ; un clic révèle les matchs à l'intérieur.
-function createCollapsibleGroup(title) {
+// Le tableau final et les matchs de poule sont entièrement reconstruits après chaque
+// enregistrement (loadAdminData) : on retient donc quels groupes sont ouverts, par clé
+// stable, pour ne pas les refermer sous le nez de l'utilisateur à chaque sauvegarde.
+const openGroups = new Set();
+
+function createCollapsibleGroup(title, groupKey) {
   const group = document.createElement("div");
   group.className = "matches-group";
+
+  const isOpen = openGroups.has(groupKey);
 
   const header = document.createElement("button");
   header.type = "button";
   header.className = "pool-card-header";
-  header.setAttribute("aria-expanded", "false");
+  header.setAttribute("aria-expanded", String(isOpen));
 
   const labelSpan = document.createElement("span");
   labelSpan.textContent = title;
@@ -1110,12 +1146,14 @@ function createCollapsibleGroup(title) {
 
   const content = document.createElement("div");
   content.className = "pool-card-content";
-  content.hidden = true;
+  content.hidden = !isOpen;
 
   header.addEventListener("click", () => {
-    const isOpen = header.getAttribute("aria-expanded") === "true";
-    header.setAttribute("aria-expanded", String(!isOpen));
-    content.hidden = isOpen;
+    const nowOpen = header.getAttribute("aria-expanded") !== "true";
+    header.setAttribute("aria-expanded", String(nowOpen));
+    content.hidden = !nowOpen;
+    if (nowOpen) openGroups.add(groupKey);
+    else openGroups.delete(groupKey);
   });
 
   group.appendChild(header);
@@ -1140,7 +1178,7 @@ function renderMatchesTab(pools, teams, matches) {
     const poolMatches = matches.filter((match) => match.pool_id === pool.id);
     if (poolMatches.length === 0) return;
 
-    const { group, content } = createCollapsibleGroup(pool.label);
+    const { group, content } = createCollapsibleGroup(pool.label, `poule-${currentCategory}-${pool.id}`);
 
     poolMatches.forEach((match) => {
       content.appendChild(createMatchRow(match, teamsById));
@@ -1304,7 +1342,7 @@ function renderBracketTab(pools, teams, poolMatches, bracketMatches) {
     const groupMatches = phases.flatMap((phase) => bracketMatches.filter((match) => match.phase === phase));
     if (groupMatches.length === 0) return;
 
-    const { group, content } = createCollapsibleGroup(label);
+    const { group, content } = createCollapsibleGroup(label, `bracket-${currentCategory}-${label}`);
 
     groupMatches.forEach((match) => {
       content.appendChild(createMatchRow(match, teamsById));
