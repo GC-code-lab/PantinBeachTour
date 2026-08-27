@@ -1,38 +1,44 @@
 const courtsInfo = document.getElementById("courts-info");
 const courtsList = document.getElementById("courts-list");
 
-// Répartition des 4 terrains, demandée par l'organisateur (terrain 1 <-> terrain 3
-// inversés, terrain 2 <-> terrain 4 inversés — d'où le Hommes/Femmes qui change avec).
-// Poule A + Poule C partagent un terrain, Poule B + Poule D partagent l'autre — et
-// cette même logique se prolonge dans le tableau final : BRACKET_PROGRESSION (voir
-// js/gestion.js) fait rejoindre qf-1/qf-4 au vainqueur de Poule A/C, qf-2/qf-3 au
-// vainqueur de Poule B/D. Il n'y a que 2 demies au total (sf-1, sf-2) : chacune
-// mélange forcément les deux côtés (sf-1 = vainqueurs qf-1+qf-2, sf-2 = vainqueurs
-// qf-3+qf-4), donc pas de rattachement "naturel" — par convention, une demi par
-// terrain : sf-1 avec la finale, sf-2 avec la petite finale.
+// Les matchs de poule se jouent par TOUR : dans une poule de 4, le tour 1 (1v4 et 2v3),
+// le tour 2 (1v3 et 2v4), le tour 3 (1v2 et 3v4) — les 2 matchs d'un même tour sont
+// joués EN MÊME TEMPS, chacun sur un des 2 terrains de la catégorie (Hommes : 1 et 4 ;
+// Femmes : 2 et 3 — le 1er terrain de la paire reçoit le 1er match du tour, le 2e
+// terrain le 2e match). Une poule utilise donc les 2 terrains de sa catégorie pour la
+// durée de ses 3 tours, puis c'est au tour de la poule suivante dans la file — les
+// deux files (Hommes / Femmes) tournent en parallèle, indépendamment l'une de l'autre.
+const GENDER_TERRAINS = { Hommes: [1, 4], Femmes: [2, 3] };
+const POOL_ORDER = {
+  Hommes: ["Poule A", "Poule B", "Poule D", "Poule C"],
+  Femmes: ["Poule A", "Poule B", "Poule C", "Poule D"],
+};
+
+// Répartition des 4 terrains pour les phases finales (indépendante de l'ordre des
+// poules ci-dessus) : Poule A + Poule C alimentent un même chemin du tableau, Poule B +
+// Poule D l'autre — BRACKET_PROGRESSION (voir js/gestion.js) fait rejoindre qf-1/qf-4
+// au vainqueur de Poule A/C, qf-2/qf-3 au vainqueur de Poule B/D. Il n'y a que 2 demies
+// au total (sf-1, sf-2), chacune mélangeant forcément les deux chemins : par convention,
+// une demi par terrain — sf-1 avec la finale, sf-2 avec la petite finale.
 const COURTS = [
   {
     terrain: 1,
     category: "Hommes",
-    poolLabels: ["Poule A", "Poule C"],
     phasesFinalesSlots: ["barrage-1", "barrage-4", "qf-1", "qf-4", "sf-1", "finale"],
   },
   {
     terrain: 2,
     category: "Femmes",
-    poolLabels: ["Poule B", "Poule D"],
     phasesFinalesSlots: ["barrage-2", "barrage-3", "qf-2", "qf-3", "sf-2", "petite-finale"],
   },
   {
     terrain: 3,
     category: "Femmes",
-    poolLabels: ["Poule A", "Poule C"],
     phasesFinalesSlots: ["barrage-1", "barrage-4", "qf-1", "qf-4", "sf-1", "finale"],
   },
   {
     terrain: 4,
     category: "Hommes",
-    poolLabels: ["Poule B", "Poule D"],
     phasesFinalesSlots: ["barrage-2", "barrage-3", "qf-2", "qf-3", "sf-2", "petite-finale"],
   },
 ];
@@ -113,20 +119,16 @@ function teamLabel(teamId, teamsById) {
   return `${team.player1_prenom} ${team.player1_nom.charAt(0)}. / ${team.player2_prenom} ${team.player2_nom.charAt(0)}.`;
 }
 
-// Alterne les matchs des deux poules d'un même terrain (A puis C, ou B puis D),
-// en respectant l'ordre de génération de chaque poule (poolMatches déjà trié par id).
-function interleaveMatches(matchesByPool, poolIds) {
-  const queues = poolIds.map((poolId) => matchesByPool.get(poolId) || []);
-  const result = [];
-  const maxLength = Math.max(0, ...queues.map((q) => q.length));
-
-  for (let i = 0; i < maxLength; i++) {
-    queues.forEach((queue) => {
-      if (queue[i]) result.push(queue[i]);
-    });
+// Découpe les matchs d'une poule (déjà dans l'ordre de génération, donc méthode du
+// cercle : 1v4,2v3,1v3,2v4,1v2,3v4) en tours de 2 matchs simultanés — le dernier tour
+// d'une poule de 3 (round-robin à 3 matchs) n'a qu'un seul match, sans simultanéité
+// possible (il reste sur le 1er terrain de la paire).
+function chunkIntoRounds(matches) {
+  const rounds = [];
+  for (let i = 0; i < matches.length; i += 2) {
+    rounds.push(matches.slice(i, i + 2));
   }
-
-  return result;
+  return rounds;
 }
 
 function renderCourts(pools, teamsById, poolMatches, bracketMatches) {
@@ -203,23 +205,34 @@ function appendPhaseSection(card, title, rows) {
   card.appendChild(section);
 }
 
+// La liste des matchs de poule d'UN terrain : les poules de la catégorie (POOL_ORDER)
+// alternent TOUR par tour — pas tous les tours de la poule A avant de passer à la
+// poule B, mais tour 1 de A, tour 1 de B, tour 1 de D, tour 1 de C, puis tour 2 de A,
+// tour 2 de B, etc. (1er terrain de la paire = 1er match du tour, 2e terrain = 2e
+// match du tour).
 function buildPoolRows(court, pools, poolMatches, teamsById) {
-  const courtPools = court.poolLabels
-    .map((label) => pools.find((pool) => pool.category === court.category && pool.label === label))
-    .filter(Boolean);
+  const terrains = GENDER_TERRAINS[court.category];
+  const terrainIndex = terrains.indexOf(court.terrain);
 
-  if (courtPools.length !== court.poolLabels.length) return [];
+  const poolRounds = POOL_ORDER[court.category].map((poolLabel) => {
+    const pool = pools.find((p) => p.category === court.category && p.label === poolLabel);
+    if (!pool) return { poolLabel, rounds: [] };
+    const matches = poolMatches.filter((match) => match.pool_id === pool.id);
+    return { poolLabel, rounds: chunkIntoRounds(matches) };
+  });
 
-  const matchesByPool = new Map(
-    courtPools.map((pool) => [pool.id, poolMatches.filter((match) => match.pool_id === pool.id)])
-  );
-  const orderedMatches = interleaveMatches(
-    matchesByPool,
-    courtPools.map((pool) => pool.id)
-  );
-  const poolLabelById = new Map(courtPools.map((pool) => [pool.id, pool.label]));
+  const maxRounds = Math.max(0, ...poolRounds.map(({ rounds }) => rounds.length));
 
-  return orderedMatches.map((match) => renderMatchRow(poolLabelById.get(match.pool_id), match, teamsById));
+  const rows = [];
+  for (let roundIndex = 0; roundIndex < maxRounds; roundIndex++) {
+    poolRounds.forEach(({ poolLabel, rounds }) => {
+      const match = rounds[roundIndex] && rounds[roundIndex][terrainIndex];
+      if (!match) return;
+      rows.push(renderMatchRow(`${poolLabel} · Tour ${roundIndex + 1}`, match, teamsById));
+    });
+  }
+
+  return rows;
 }
 
 // Contrairement aux poules (où les équipes sont connues dès le tirage), les matchs de
