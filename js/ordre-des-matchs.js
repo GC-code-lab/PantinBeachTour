@@ -1,11 +1,10 @@
 const courtsInfo = document.getElementById("courts-info");
 const courtsList = document.getElementById("courts-list");
 
-// Répartition des 4 terrains, demandée par l'organisateur (terrain 1 inchangé, les
-// contenus de 2/3/4 tournent : ce qui était sur 2 est maintenant sur 3, ce qui était
-// sur 3 est sur 4, ce qui était sur 4 est sur 2 — d'où le Hommes/Femmes qui change
-// avec). Poule A + Poule C partagent un terrain, Poule B + Poule D partagent l'autre —
-// et cette même logique se prolonge dans le tableau final : BRACKET_PROGRESSION (voir
+// Répartition des 4 terrains, demandée par l'organisateur (terrain 1 <-> terrain 3
+// inversés, terrain 2 <-> terrain 4 inversés — d'où le Hommes/Femmes qui change avec).
+// Poule A + Poule C partagent un terrain, Poule B + Poule D partagent l'autre — et
+// cette même logique se prolonge dans le tableau final : BRACKET_PROGRESSION (voir
 // js/gestion.js) fait rejoindre qf-1/qf-4 au vainqueur de Poule A/C, qf-2/qf-3 au
 // vainqueur de Poule B/D. Il n'y a que 2 demies au total (sf-1, sf-2) : chacune
 // mélange forcément les deux côtés (sf-1 = vainqueurs qf-1+qf-2, sf-2 = vainqueurs
@@ -14,25 +13,25 @@ const courtsList = document.getElementById("courts-list");
 const COURTS = [
   {
     terrain: 1,
-    category: "Femmes",
+    category: "Hommes",
     poolLabels: ["Poule A", "Poule C"],
     phasesFinalesSlots: ["barrage-1", "barrage-4", "qf-1", "qf-4", "sf-1", "finale"],
   },
   {
     terrain: 2,
-    category: "Hommes",
+    category: "Femmes",
     poolLabels: ["Poule B", "Poule D"],
     phasesFinalesSlots: ["barrage-2", "barrage-3", "qf-2", "qf-3", "sf-2", "petite-finale"],
   },
   {
     terrain: 3,
-    category: "Hommes",
+    category: "Femmes",
     poolLabels: ["Poule A", "Poule C"],
     phasesFinalesSlots: ["barrage-1", "barrage-4", "qf-1", "qf-4", "sf-1", "finale"],
   },
   {
     terrain: 4,
-    category: "Femmes",
+    category: "Hommes",
     poolLabels: ["Poule B", "Poule D"],
     phasesFinalesSlots: ["barrage-2", "barrage-3", "qf-2", "qf-3", "sf-2", "petite-finale"],
   },
