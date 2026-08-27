@@ -1200,35 +1200,70 @@ const BRACKET_GROUPS = [
   { label: "Finales", phases: ["petite_finale", "finale"] },
 ];
 
-// Classe les équipes d'une poule par victoires, puis par différence de points
-// marqués/encaissés sur les matchs de poule en cas d'égalité.
-function computePoolStandings(pool, teams, poolMatches) {
-  const stats = new Map(
-    teams
-      .filter((team) => team.pool_id === pool.id)
-      .map((team) => [team.id, { team, wins: 0, diff: 0 }])
-  );
+// Classe les équipes d'une poule par victoires ; en cas d'égalité de victoires entre
+// plusieurs équipes (2 à égalité, ou "triangulaire" à 3 dans une poule de 4), l'ordre
+// de départage est : 1) pointaverage UNIQUEMENT sur les matchs joués entre les
+// équipes à égalité, 2) si toujours égal, pointaverage face à la ou les équipes HORS
+// du groupe (la "4e équipe"), 3) si toujours égal, rang de tête de série.
+function computePoolStandings(pool, teams, poolMatches, seedRankByTeamId) {
+  const poolTeams = teams.filter((team) => team.pool_id === pool.id);
+  const teamsInPoolMatches = poolMatches.filter((match) => match.pool_id === pool.id);
 
-  poolMatches
-    .filter((match) => match.pool_id === pool.id)
-    .forEach((match) => {
-      const set = match.sets && match.sets[0];
-      const stats1 = stats.get(match.team1_id);
-      const stats2 = stats.get(match.team2_id);
-      if (!set || !stats1 || !stats2) return;
+  const wins = new Map(poolTeams.map((team) => [team.id, 0]));
+  teamsInPoolMatches.forEach((match) => {
+    const set = match.sets && match.sets[0];
+    if (!set || !wins.has(match.team1_id) || !wins.has(match.team2_id)) return;
+    const winnerId = set.score_team1 > set.score_team2 ? match.team1_id : match.team2_id;
+    wins.set(winnerId, wins.get(winnerId) + 1);
+  });
 
-      stats1.diff += set.score_team1 - set.score_team2;
-      stats2.diff += set.score_team2 - set.score_team1;
-      if (set.score_team1 > set.score_team2) {
-        stats1.wins += 1;
-      } else {
-        stats2.wins += 1;
+  const groupsByWins = new Map();
+  poolTeams.forEach((team) => {
+    const winCount = wins.get(team.id);
+    if (!groupsByWins.has(winCount)) groupsByWins.set(winCount, []);
+    groupsByWins.get(winCount).push(team);
+  });
+
+  const ranked = [];
+  [...groupsByWins.keys()]
+    .sort((a, b) => b - a)
+    .forEach((winCount) => {
+      const group = groupsByWins.get(winCount);
+      if (group.length === 1) {
+        ranked.push(group[0]);
+        return;
       }
+
+      const groupIds = new Set(group.map((team) => team.id));
+      const subDiff = new Map(group.map((team) => [team.id, 0]));
+      const externalDiff = new Map(group.map((team) => [team.id, 0]));
+
+      teamsInPoolMatches.forEach((match) => {
+        const set = match.sets && match.sets[0];
+        if (!set) return;
+        const inGroup1 = groupIds.has(match.team1_id);
+        const inGroup2 = groupIds.has(match.team2_id);
+        if (inGroup1 && inGroup2) {
+          subDiff.set(match.team1_id, subDiff.get(match.team1_id) + (set.score_team1 - set.score_team2));
+          subDiff.set(match.team2_id, subDiff.get(match.team2_id) + (set.score_team2 - set.score_team1));
+        } else if (inGroup1) {
+          externalDiff.set(match.team1_id, externalDiff.get(match.team1_id) + (set.score_team1 - set.score_team2));
+        } else if (inGroup2) {
+          externalDiff.set(match.team2_id, externalDiff.get(match.team2_id) + (set.score_team2 - set.score_team1));
+        }
+      });
+
+      const sortedGroup = group.slice().sort((a, b) => {
+        const sub = subDiff.get(b.id) - subDiff.get(a.id);
+        if (sub !== 0) return sub;
+        const ext = externalDiff.get(b.id) - externalDiff.get(a.id);
+        if (ext !== 0) return ext;
+        return seedRankByTeamId.get(a.id) - seedRankByTeamId.get(b.id);
+      });
+      ranked.push(...sortedGroup);
     });
 
-  return [...stats.values()]
-    .sort((a, b) => b.wins - a.wins || b.diff - a.diff)
-    .map((s) => s.team);
+  return ranked;
 }
 
 generateBracketButton.addEventListener("click", async () => {
@@ -1269,9 +1304,10 @@ generateBracketButton.addEventListener("click", async () => {
     );
     if (!confirmed) return;
 
+    const seedRankByTeamId = new Map(defaultSeedOrder(teams).map((team, index) => [team.id, index + 1]));
     const standings = {};
     pools.forEach((pool) => {
-      standings[pool.label] = computePoolStandings(pool, teams, poolMatches);
+      standings[pool.label] = computePoolStandings(pool, teams, poolMatches, seedRankByTeamId);
     });
 
     for (const label of ["Poule A", "Poule B", "Poule C", "Poule D"]) {

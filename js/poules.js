@@ -70,40 +70,86 @@ function defaultSeedOrder(teams) {
   });
 }
 
-// Classement d'une poule : victoires, puis différence de points, puis tête de série
-// (numéro de rang, 1 = meilleure tête de série) — c'est ce dernier critère qui fait
-// l'ordre tant qu'aucun match n'a encore de score.
+// Classement d'une poule : victoires, puis différence de points, puis tête de série.
+// Important : en cas d'égalité de victoires entre plusieurs équipes (2 à égalité, ou
+// "triangulaire" à 3 dans une poule de 4), l'ordre de départage est : 1) pointaverage
+// (colonne "Diff") calculé UNIQUEMENT sur les matchs joués entre les équipes à
+// égalité, 2) si toujours égal, pointaverage face à la ou les équipes HORS du groupe
+// (la "4e équipe", pas affiché dans le tableau), 3) si toujours égal, tête de série.
 function computePoolStandings(pool, teamsInPool, poolMatches, seedRankByTeamId) {
+  const teamsInPoolMatches = poolMatches.filter((match) => match.pool_id === pool.id);
   const stats = new Map(
-    teamsInPool.map((team) => [team.id, { team, wins: 0, losses: 0, diff: 0 }])
+    teamsInPool.map((team) => [team.id, { team, wins: 0, losses: 0, diff: 0, externalDiff: 0 }])
   );
 
-  poolMatches
-    .filter((match) => match.pool_id === pool.id)
-    .forEach((match) => {
-      const set = match.sets && match.sets[0];
-      const stats1 = stats.get(match.team1_id);
-      const stats2 = stats.get(match.team2_id);
-      if (!set || !stats1 || !stats2) return;
+  teamsInPoolMatches.forEach((match) => {
+    const set = match.sets && match.sets[0];
+    const stats1 = stats.get(match.team1_id);
+    const stats2 = stats.get(match.team2_id);
+    if (!set || !stats1 || !stats2) return;
 
-      stats1.diff += set.score_team1 - set.score_team2;
-      stats2.diff += set.score_team2 - set.score_team1;
-      if (set.score_team1 > set.score_team2) {
-        stats1.wins += 1;
-        stats2.losses += 1;
-      } else {
-        stats2.wins += 1;
-        stats1.losses += 1;
+    if (set.score_team1 > set.score_team2) {
+      stats1.wins += 1;
+      stats2.losses += 1;
+    } else {
+      stats2.wins += 1;
+      stats1.losses += 1;
+    }
+  });
+
+  const groupsByWins = new Map();
+  stats.forEach((s) => {
+    if (!groupsByWins.has(s.wins)) groupsByWins.set(s.wins, []);
+    groupsByWins.get(s.wins).push(s);
+  });
+
+  const ranked = [];
+  [...groupsByWins.keys()]
+    .sort((a, b) => b - a)
+    .forEach((winCount) => {
+      const group = groupsByWins.get(winCount);
+
+      if (group.length === 1) {
+        // Seule dans son groupe : pas de départage à faire, la diff affichée compte
+        // tous ses matchs de poule (y compris contre des équipes d'autres groupes).
+        const solo = group[0];
+        teamsInPoolMatches.forEach((match) => {
+          const set = match.sets && match.sets[0];
+          if (!set) return;
+          if (match.team1_id === solo.team.id) solo.diff += set.score_team1 - set.score_team2;
+          else if (match.team2_id === solo.team.id) solo.diff += set.score_team2 - set.score_team1;
+        });
+        ranked.push(solo);
+        return;
       }
+
+      const groupIds = new Set(group.map((s) => s.team.id));
+      teamsInPoolMatches.forEach((match) => {
+        const set = match.sets && match.sets[0];
+        if (!set) return;
+        const inGroup1 = groupIds.has(match.team1_id);
+        const inGroup2 = groupIds.has(match.team2_id);
+        if (inGroup1 && inGroup2) {
+          stats.get(match.team1_id).diff += set.score_team1 - set.score_team2;
+          stats.get(match.team2_id).diff += set.score_team2 - set.score_team1;
+        } else if (inGroup1) {
+          stats.get(match.team1_id).externalDiff += set.score_team1 - set.score_team2;
+        } else if (inGroup2) {
+          stats.get(match.team2_id).externalDiff += set.score_team2 - set.score_team1;
+        }
+      });
+
+      const sortedGroup = group.slice().sort((a, b) => {
+        const diff = b.diff - a.diff;
+        if (diff !== 0) return diff;
+        const ext = b.externalDiff - a.externalDiff;
+        if (ext !== 0) return ext;
+        return seedRankByTeamId.get(a.team.id) - seedRankByTeamId.get(b.team.id);
+      });
+      ranked.push(...sortedGroup);
     });
 
-  return [...stats.values()].sort((a, b) => {
-    return (
-      b.wins - a.wins ||
-      b.diff - a.diff ||
-      seedRankByTeamId.get(a.team.id) - seedRankByTeamId.get(b.team.id)
-    );
-  });
+  return ranked;
 }
 
 function renderStandingsTable(standings, seedRankByTeamId) {
