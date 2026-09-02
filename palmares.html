@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ordre des matchs — Pantin Beach Tour</title>
+  <title>Palmarès — Pantin Beach Tour</title>
   <link rel="stylesheet" href="css/style.css?v=52">
 </head>
 <body>
@@ -14,17 +14,17 @@
         <ul>
           <li><a href="index.html">Poules</a></li>
           <li><a href="phases-finales.html">Phases finales</a></li>
-          <li><a href="ordre-des-matchs.html" class="active">Ordre des matchs</a></li>
-          <li><a href="palmares.html">Palmarès</a></li>
+          <li><a href="ordre-des-matchs.html">Ordre des matchs</a></li>
+          <li><a href="palmares.html" class="active">Palmarès</a></li>
         </ul>
       </nav>
     </div>
   </header>
 
-  <main class="container courts-main">
-    <h1>Ordre des matchs</h1>
-    <p id="courts-info" class="form-message"></p>
-    <div id="courts-list" class="courts-list"></div>
+  <main class="container bracket-main">
+    <h1>Palmarès</h1>
+    <p id="archives-info" class="form-message"></p>
+    <div id="archives-list" class="archives-list"></div>
   </main>
 
   <footer class="site-footer">
@@ -37,6 +37,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js?v=1"></script>
   <script src="js/nav.js?v=1"></script>
-  <script src="js/ordre-des-matchs.js?v=19"></script>
+  <script src="js/bracket-render.js?v=1"></script>
+  <script src="js/palmares.js?v=1"></script>
 </body>
 </html>

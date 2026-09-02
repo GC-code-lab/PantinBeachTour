@@ -43,8 +43,14 @@ logoutButton.addEventListener("click", async () => {
 // Seuls les admins voient l'inscription, les têtes de série/poules, et la gestion des rôles.
 // Scorer ET admin voient Matchs & Résultats. Un compte sans rôle (créé mais pas encore
 // assigné) ne voit RIEN de tout ça — juste l'onglet Connexion, comme un visiteur non connecté.
+// Le bouton "Sauvegarde du tournoi" (Palmarès) est réservé aux admins, comme les
+// autres actions structurantes du site (inscriptions, poules) — un scorer ne le voit
+// jamais, même une fois le tournoi terminé.
+let isAdminRole = false;
+
 function applyRoleUI(role) {
   const isAdmin = role === "admin";
+  isAdminRole = isAdmin;
   const hasAccess = role === "admin" || role === "scorer";
   inscriptionTabButton.hidden = !isAdmin;
   poulesTabButton.hidden = !isAdmin;
@@ -502,6 +508,10 @@ async function loadAdminData() {
   renderBracketTab(categoryPools, categoryTeams, categoryMatches, categoryBracketMatches);
   seedTeams = defaultSeedOrder(categoryTeams);
   renderSeedingList();
+
+  // Indépendant de currentCategory : le bouton "Sauvegarde du tournoi" exige que
+  // les DEUX catégories soient terminées, pas seulement celle affichée.
+  updateArchiveSection(teams, matches, bracketMatches);
 }
 
 // Une suppression d'équipe invalide poules ET matchs de sa catégorie (clés étrangères
@@ -1387,3 +1397,108 @@ function renderBracketTab(pools, teams, poolMatches, bracketMatches) {
     bracketList.appendChild(group);
   });
 }
+
+// --- Sauvegarde du tournoi dans le Palmarès ---
+
+const archiveSection = document.getElementById("archive-section");
+const archiveOpenButton = document.getElementById("archive-open-button");
+const archiveForm = document.getElementById("archive-form");
+const archiveNameInput = document.getElementById("archive-name");
+const archiveMonthSelect = document.getElementById("archive-month");
+const archiveYearInput = document.getElementById("archive-year");
+const archiveCancelButton = document.getElementById("archive-cancel-button");
+const archiveMessage = document.getElementById("archive-message");
+
+const ARCHIVE_MOIS = [
+  "Janvier", "Février", "Mars", "Avril", "Mai", "Juin",
+  "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
+];
+
+ARCHIVE_MOIS.forEach((label, index) => {
+  const option = document.createElement("option");
+  option.value = String(index + 1);
+  option.textContent = label;
+  archiveMonthSelect.appendChild(option);
+});
+
+// Dernières données chargées (toutes catégories confondues), pour construire le
+// snapshot au clic sur "Confirmer" sans refaire de requêtes.
+let latestTeamsForArchive = [];
+let latestBracketMatchesForArchive = [];
+
+// Un match de poule ou de phase finale est "terminé" (status === "termine") dès
+// qu'il a assez de sets gagnés — voir requiredSetWins/saveMatchSets plus haut.
+function isCategoryComplete(category, poolMatches, bracketMatches) {
+  const catPoolMatches = poolMatches.filter((match) => match.category === category);
+  const catBracketMatches = bracketMatches.filter((match) => match.category === category);
+  if (catPoolMatches.length === 0 || catBracketMatches.length === 0) return false;
+
+  const hasFinale = catBracketMatches.some((match) => match.phase === "finale");
+  const hasPetiteFinale = catBracketMatches.some((match) => match.phase === "petite_finale");
+  if (!hasFinale || !hasPetiteFinale) return false;
+
+  return (
+    catPoolMatches.every((match) => match.status === "termine") &&
+    catBracketMatches.every((match) => match.status === "termine")
+  );
+}
+
+function updateArchiveSection(teams, poolMatches, bracketMatches) {
+  const bothCategoriesComplete = ["Hommes", "Femmes"].every((category) =>
+    isCategoryComplete(category, poolMatches, bracketMatches)
+  );
+
+  archiveSection.hidden = !(isAdminRole && bothCategoriesComplete);
+  latestTeamsForArchive = teams;
+  latestBracketMatchesForArchive = bracketMatches;
+}
+
+archiveOpenButton.addEventListener("click", () => {
+  const now = new Date();
+  archiveYearInput.value = now.getFullYear();
+  archiveMonthSelect.value = String(now.getMonth() + 1);
+  archiveMessage.textContent = "";
+  archiveForm.hidden = false;
+  archiveOpenButton.hidden = true;
+});
+
+archiveCancelButton.addEventListener("click", () => {
+  archiveForm.hidden = true;
+  archiveOpenButton.hidden = false;
+  archiveMessage.textContent = "";
+});
+
+// Snapshot figé, indépendant des tables live teams/matches/pools : ces dernières
+// seront vidées avant le prochain tournoi, donc le Palmarès doit tout stocker
+// lui-même (équipes + matchs de phases finales avec leurs sets), pas juste des ids.
+function buildTournamentSnapshot() {
+  const categories = {};
+  ["Hommes", "Femmes"].forEach((category) => {
+    categories[category] = {
+      teams: latestTeamsForArchive.filter((team) => team.category === category),
+      matches: latestBracketMatchesForArchive.filter((match) => match.category === category),
+    };
+  });
+  return { categories };
+}
+
+archiveForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  archiveMessage.textContent = "Sauvegarde en cours…";
+
+  const { error } = await supabaseClient.from("tournament_archives").insert({
+    name: archiveNameInput.value.trim(),
+    month: Number(archiveMonthSelect.value),
+    year: Number(archiveYearInput.value),
+    data: buildTournamentSnapshot(),
+  });
+
+  if (error) {
+    archiveMessage.textContent = "Erreur : " + error.message;
+    return;
+  }
+
+  archiveMessage.textContent = "Tournoi sauvegardé dans le Palmarès ✅";
+  archiveForm.hidden = true;
+  archiveOpenButton.hidden = false;
+});

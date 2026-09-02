@@ -204,16 +204,19 @@ section {
   margin-top: 0.85rem;
 }
 
-.form input {
+.form input,
+.form select {
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   font-size: 1rem;
   background: var(--color-surface);
+  font-family: inherit;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.form input:focus {
+.form input:focus,
+.form select:focus {
   outline: none;
   border-color: var(--color-ocean);
   box-shadow: 0 0 0 3px rgba(0, 119, 182, 0.15);
@@ -699,6 +702,13 @@ section {
   border-radius: 50%;
   background: #2ecc71;
   margin-right: 6px;
+}
+
+.archives-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 /* Tableau à élimination directe */

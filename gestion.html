@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestion du tournoi — Pantin Beach Tour</title>
-  <link rel="stylesheet" href="css/style.css?v=51">
+  <link rel="stylesheet" href="css/style.css?v=52">
 </head>
 <body>
   <header class="site-header">
@@ -15,6 +15,7 @@
           <li><a href="index.html">Poules</a></li>
           <li><a href="phases-finales.html">Phases finales</a></li>
           <li><a href="ordre-des-matchs.html">Ordre des matchs</a></li>
+          <li><a href="palmares.html">Palmarès</a></li>
         </ul>
       </nav>
     </div>
@@ -183,6 +184,34 @@
         <button id="generate-bracket-button" type="button" class="button" hidden>Générer le tableau des phases finales</button>
         <div id="bracket-list"></div>
       </section>
+
+      <section id="archive-section" hidden>
+        <h2>Sauvegarde du tournoi</h2>
+        <p>Les deux catégories (Hommes et Femmes) sont terminées : tu peux enregistrer ce tournoi dans le Palmarès public.</p>
+        <button id="archive-open-button" type="button" class="button">Sauvegarde du tournoi</button>
+
+        <form id="archive-form" class="form" hidden>
+          <label for="archive-name">Nom du tournoi</label>
+          <input type="text" id="archive-name" name="archive-name" required value="Pantin Beach Tour">
+
+          <div class="player-row">
+            <div>
+              <label for="archive-month">Mois</label>
+              <select id="archive-month" name="archive-month" required></select>
+            </div>
+            <div>
+              <label for="archive-year">Année</label>
+              <input type="number" id="archive-year" name="archive-year" required>
+            </div>
+          </div>
+
+          <div class="generate-buttons">
+            <button type="submit" class="button">Confirmer la sauvegarde</button>
+            <button type="button" id="archive-cancel-button" class="button button-sm">Annuler</button>
+          </div>
+        </form>
+        <p id="archive-message" class="form-message"></p>
+      </section>
     </div>
   </main>
 
@@ -196,6 +225,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js?v=1"></script>
   <script src="js/nav.js?v=1"></script>
-  <script src="js/gestion.js?v=52"></script>
+  <script src="js/gestion.js?v=53"></script>
 </body>
 </html>
