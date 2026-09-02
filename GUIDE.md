@@ -38,8 +38,9 @@ Pas de jargon inutile, juste les 3 briques à connaître :
 |---|---|---|
 | **Poules** (page d'accueil) | `index.html` | Les 4 poules (A/B/C/D) par catégorie, les équipes de chaque poule, et les matchs/scores de poule (repliés par défaut, dépliables) |
 | **Phases finales** | `phases-finales.html` | Le tableau à élimination directe en dessin (barrages → quarts → demies → finale + petite finale), avec un podium en dessous une fois le tournoi terminé |
+| **Ordre des matchs** | `ordre-des-matchs.html` | L'ordre de passage des matchs **terrain par terrain** (voir section 8) — pratique à afficher/imprimer le jour J pour savoir qui joue où et dans quel ordre |
 
-Ces deux pages ont un sélecteur **Hommes / Femmes** en haut, pour basculer entre les deux catégories.
+Les pages **Poules** et **Phases finales** ont un sélecteur **Hommes / Femmes** en haut, pour basculer entre les deux catégories. La page **Ordre des matchs** n'a pas ce sélecteur : elle affiche les 4 terrains d'un coup, chacun dédié à une seule catégorie (voir section 8).
 
 **Avant même que les poules soient terminées**, le tableau des phases finales affiche déjà les croisements connus à l'avance (ex: "2e Poule C" contre "3e Poule B" pour un barrage, "1er Poule A" pour un quart) — ces croisements sont fixés par le format du tournoi, indépendamment des résultats. Le reste (ex: "vainqueur du quart 1") s'affiche juste comme "TBD" tant que ce n'est pas joué, pour ne pas surcharger l'affichage avec une évidence.
 
@@ -144,12 +145,44 @@ Si tu vas dans Supabase → Table Editor, tu verras ces tables :
   - Barrages : 2 sets à 15 points, avec un 3ᵉ set (tie-break) à 11 points si 1 partout.
   - Quarts, demies, petite finale, finale : 2 sets à 21 points, tie-break à 15 points si 1 partout.
 - **Répartition en poules (méthode serpentin)** : les têtes de série sont distribuées en zigzag entre les 4 poules pour équilibrer le niveau (ex: Poule A reçoit les têtes de série 1, 8, 9, 16 — jamais les meilleures d'un coup).
+- **Classement d'une poule** : d'abord par nombre de victoires. En cas d'égalité de victoires entre plusieurs équipes (2 équipes à égalité, ou une "triangulaire" à 3 équipes dans une poule de 4), le départage se fait dans cet ordre : 1) la différence de points, calculée **uniquement sur les matchs joués entre les équipes à égalité** (ignore les scores face à l'équipe hors du groupe) ; 2) si toujours égal, la différence de points face à la ou les équipes **hors du groupe** ; 3) si toujours égal, le rang de tête de série. Cette logique est appliquée à l'identique côté public (poules) et côté admin (génération des phases finales), pour que les deux classements affichés concordent toujours.
 - **Barrages** : les 2èmes et 3èmes de poule s'affrontent (jamais deux équipes de la même poule), les vainqueurs rejoignent les 1ers de poule en quarts. Le tableau est conçu pour que, si les têtes de série se confirment, on ait tête de série 1 contre 4, et 2 contre 3 en demies.
 - **Petite finale** : les deux équipes battues en demies s'affrontent pour la 3ᵉ place, en parallèle de la finale.
 
 ---
 
-## 8. Faire tourner le site sur ton ordinateur
+## 8. L'ordre des matchs par terrain
+
+La page publique **Ordre des matchs** (`ordre-des-matchs.html`, fichier `js/ordre-des-matchs.js`) répond à une question très concrète le jour J : *"sur quel terrain et dans quel ordre je joue ?"*. Elle affiche les 4 terrains côte à côte, chacun avec sa liste de matchs dans l'ordre où ils doivent être joués (matchs de poule d'abord, puis phases finales une fois disponibles).
+
+### Répartition des terrains par catégorie
+
+Il y a 4 terrains, dédiés en dur à une catégorie chacun :
+
+| Terrain | Catégorie |
+|---|---|
+| 1 | Hommes |
+| 2 | Femmes |
+| 3 | Femmes |
+| 4 | Hommes |
+
+Chaque catégorie utilise donc 2 terrains en parallèle, indépendamment de l'autre catégorie.
+
+### Matchs de poule : un tour = 2 matchs simultanés
+
+Dans une poule, les matchs se jouent par **tour** (une poule de 4 a 3 tours : 1v4+2v3, puis 1v3+2v4, puis 1v2+3v4 — méthode du cercle, voir aussi section 7). Les 2 matchs d'un même tour se jouent **en même temps**, chacun sur un des 2 terrains de la catégorie (le 1er terrain de la paire reçoit le 1er match du tour, le 2e terrain le 2e match). Une poule de 3 a un tour à 1 seul match — pas de simultanéité possible sur ce tour-là, il reste sur le 1er terrain.
+
+Une poule occupe donc les 2 terrains de sa catégorie pendant toute la durée de ses tours, puis c'est au tour de la poule suivante dans la file. Les poules ne s'enchaînent pas dans l'ordre alphabétique strict : l'ordre de passage (`POOL_ORDER` dans `js/ordre-des-matchs.js`) est A → B → D → C côté Hommes, A → B → C → D côté Femmes — un choix arbitraire fait pour équilibrer/varier l'enchaînement, pas une règle du format du tournoi. Si tu veux changer cet ordre un jour, c'est cette liste qu'il faut modifier.
+
+### Phases finales : chaque terrain suit "son" chemin du tableau
+
+Les 4 terrains sont aussi répartis pour les phases finales, indépendamment de l'ordre des poules ci-dessus : Poule A et Poule C alimentent un même chemin du tableau à élimination directe, Poule B et Poule D l'autre. Comme il n'y a que 2 demi-finales au total et qu'elles mélangent forcément les deux chemins, la convention retenue est : une demie par terrain — la demi 1 avec la finale sur un terrain, la demi 2 avec la petite finale sur l'autre.
+
+Tant qu'un match de phase finale n'a pas encore d'équipes connues, la page affiche les croisements prévus par le format (ex: "2e Poule C" / "3e Poule B" pour un barrage) — mêmes libellés que la page publique Phases finales.
+
+---
+
+## 9. Faire tourner le site sur ton ordinateur
 
 Depuis le dossier du projet, dans le Terminal :
 
@@ -161,7 +194,7 @@ Puis ouvrir `http://localhost:8000` dans le navigateur. (Ce script maison sert l
 
 ---
 
-## 9. Le code et sa sauvegarde
+## 10. Le code et sa sauvegarde
 
 Le code est sur GitHub : `github.com/GC-code-lab/PantinBeachTour`. Pour sauvegarder tes modifications :
 
@@ -177,17 +210,17 @@ git push
 
 ---
 
-## 10. En cas de souci
+## 11. En cas de souci
 
-- **"Une modification que Claude a faite ne s'affiche pas"** : recharge la page (le serveur local ne met rien en cache, donc un simple rechargement suffit).
+- **"Une modification que Claude a faite ne s'affiche pas"** : recharge la page (le serveur local ne met rien en cache, donc un simple rechargement suffit en général). Si un rechargement classique (ou même forcé, Cmd+Shift+R) ne suffit pas — ça arrive, certains navigateurs gardent une page "en mémoire" (cache retour-arrière) qui ignore les réglages anti-cache du serveur — ouvre la page dans une **fenêtre de navigation privée**, ou ferme complètement l'onglet et rouvre l'adresse : ça repart toujours d'une page neuve.
 - **Erreur du style "column does not exist" ou "Could not find the function"** : ça veut presque toujours dire qu'une requête SQL donnée par Claude n'a pas encore été lancée dans le SQL Editor de Supabase.
 - **Un nouveau compte ne peut pas se connecter ("Email not confirmed")** : ça ne devrait plus arriver — un déclencheur automatique confirme chaque compte dès sa création. Si ça revient, redemande à Claude de vérifier le trigger `auto_confirm_email_trigger`.
-- **Une modification faite sur le site en ligne (pas en local) ne s'affiche pas** : voir l'encadré sur le cache dans la section 9 — il manque probablement un incrément du `?v=N` sur le fichier concerné.
+- **Une modification faite sur le site en ligne (pas en local) ne s'affiche pas** : voir l'encadré sur le cache dans la section 10 — il manque probablement un incrément du `?v=N` sur le fichier concerné.
 - **En lançant une requête SQL dans Supabase, erreur `unterminated dollar-quoted string`, avec des lignes `ALTER TABLE ... ENABLE ROW LEVEL SECURITY` qui apparaissent toutes seules au milieu du code** : c'est un souci connu de l'éditeur SQL de Supabase — un outil d'auto-complétion ("Assistant") essaie d'ajouter automatiquement des sécurités RLS et se trompe sur les fonctions qui contiennent un bloc `declare`, cassant la requête. Solution : utiliser **SQL Editor → New query** (l'éditeur classique) plutôt qu'un assistant/chat qui génère et exécute du SQL, et coller le bloc SQL donné tel quel.
 - **Tu ne te souviens plus de rien** : montre ce fichier à Claude en début de conversation, ça remet tout en contexte instantanément.
 
 ---
 
-## 11. Historique des décisions
+## 12. Historique des décisions
 
 **Import du classement des équipes** (14/08/2026) : plutôt qu'un bouton "connecté à PVS" (pas raisonnable — PVS n'a pas de mot de passe classique, connexion uniquement par Google/lien magique, donc un serveur ne peut pas s'y connecter à ta place) ou qu'une intégration API Claude avec clé secrète (backend à maintenir pour un usage 1x/tournoi, disproportionné), la solution retenue est un **copier-coller de JSON** : tu demandes à un chat IA de ton choix de lire la capture d'écran et de te sortir un JSON, tu le colles dans la section "Importer plusieurs équipes" de l'onglet Inscription (voir section 4). Zéro clé API, zéro backend à maintenir, à voir si on change ça.
