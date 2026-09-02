@@ -17,9 +17,9 @@ async function loadArchives() {
   const { data: archives, error } = await supabaseClient
     .from("tournament_archives")
     .select("*")
-    .order("year", { ascending: false })
-    .order("month", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order("year", { ascending: true })
+    .order("month", { ascending: true })
+    .order("created_at", { ascending: true });
 
   if (error) {
     archivesInfo.textContent = "Erreur de chargement du palmarès.";
