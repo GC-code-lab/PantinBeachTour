@@ -6,6 +6,13 @@ const MOIS = [
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
 
+// Seul le compte principal (voir SUPER_ADMIN_EMAIL dans gestion.js) peut supprimer
+// un tournoi du Palmarès — un tournoi archivé n'a normalement pas vocation à être
+// retiré, ce bouton n'est là que pour rattraper une erreur de sauvegarde. Vérifié
+// aussi côté serveur dans delete_tournament_archive : ceci n'est qu'un affichage.
+const SUPER_ADMIN_EMAIL = "gabriel.cohen.1997@gmail.com";
+let isOwner = false;
+
 async function loadArchives() {
   const { data: archives, error } = await supabaseClient
     .from("tournament_archives")
@@ -27,6 +34,24 @@ async function loadArchives() {
 
   archivesInfo.textContent = "";
   renderArchives(archives);
+}
+
+async function deleteArchive(archive) {
+  const confirmed = confirm(
+    `Supprimer "${archive.name} — ${MOIS[archive.month - 1]} ${archive.year}" du Palmarès ? Action irréversible.`
+  );
+  if (!confirmed) return;
+
+  const { error } = await supabaseClient.rpc("delete_tournament_archive", {
+    archive_id: archive.id,
+  });
+
+  if (error) {
+    alert("Erreur : " + error.message);
+    return;
+  }
+
+  loadArchives();
 }
 
 // Même pattern que js/ordre-des-matchs.js / js/poules.js : un bouton-titre repliable
@@ -114,8 +139,23 @@ function renderArchives(archives) {
     content.appendChild(bracketContainer);
     renderSelectedCategory();
 
+    if (isOwner) {
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "button button-sm button-danger";
+      deleteButton.textContent = "Supprimer ce tournoi";
+      deleteButton.addEventListener("click", () => deleteArchive(archive));
+      content.appendChild(deleteButton);
+    }
+
     archivesList.appendChild(section);
   });
 }
 
-loadArchives();
+// Page publique (pas de garde de session comme gestion.html) : on lit juste la
+// session courante, si elle existe, pour savoir s'il faut afficher le bouton
+// "Supprimer" réservé au compte principal.
+supabaseClient.auth.onAuthStateChange((_event, session) => {
+  isOwner = Boolean(session && session.user.email === SUPER_ADMIN_EMAIL);
+  loadArchives();
+});

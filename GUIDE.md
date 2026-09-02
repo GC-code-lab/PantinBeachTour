@@ -96,6 +96,8 @@ Sur la page publique **Palmarès**, chaque tournoi sauvegardé apparaît sous fo
 
 ⚠️ Le bouton n'apparaît que si les deux catégories sont complètes en même temps — si une seule catégorie est finie, il faut attendre l'autre avant de pouvoir sauvegarder.
 
+Sur la page publique Palmarès, quand tu es connecté avec ton compte principal (le "Propriétaire", voir section 6), un bouton **"Supprimer ce tournoi"** apparaît en bas de chaque tournoi déplié — pour rattraper une erreur de sauvegarde (mauvais nom, mauvais mois...). Personne d'autre ne voit ce bouton, ni même les autres admins.
+
 ---
 
 ## 6. Les comptes et les droits (qui peut faire quoi)
@@ -128,17 +130,18 @@ Une personne qui rentre le bon code dans le champ "Code" en créant son compte r
 
 ### Le compte principal (toi, Gabriel) — "Propriétaire"
 
-Le compte `gabriel.cohen.1997@gmail.com` a un statut à part, codé en dur dans la base de données (pas un rôle comme les autres — voir `assign_role`/`remove_role`/`delete_account` dans le SQL Supabase si tu dois le retrouver un jour) :
+Le compte `gabriel.cohen.1997@gmail.com` a un statut à part, codé en dur dans la base de données (pas un rôle comme les autres — voir `assign_role`/`remove_role`/`delete_account`/`delete_tournament_archive` dans le SQL Supabase si tu dois le retrouver un jour) :
 
 - Il s'affiche en haut de la liste "Comptes", avec un badge **"Propriétaire"** au lieu de "Admin", et personne (même toi) ne peut lui retirer ses droits admin via l'interface.
 - C'est le **seul** compte qui peut rétrograder un autre admin (les autres admins ne le peuvent pas entre eux).
 - C'est le **seul** compte qui voit un bouton **"Supprimer"** à côté de chaque compte (sauf le sien) — supprime définitivement le compte (email + mot de passe + rôle). Irréversible, avec une confirmation avant.
+- C'est aussi le **seul** compte qui voit un bouton **"Supprimer ce tournoi"** sur la page publique Palmarès (voir section 5) — pour rattraper une erreur de sauvegarde.
 
 Si un jour tu changes d'adresse email principale, il faut redemander à Claude de mettre à jour cette adresse dans les fonctions SQL correspondantes.
 
 ### Pourquoi c'est sécurisé
 
-Ce n'est pas juste une question d'affichage : la base de données elle-même vérifie le rôle (et l'identité du compte principal) avant d'autoriser une modification, directement dans les fonctions SQL (`assign_role`, `remove_role`, `delete_account`). Même si quelqu'un bidouillait le site, il ne pourrait ni changer un rôle sans être admin, ni rétrograder un admin sans être le compte principal, ni supprimer un compte du tout sauf en étant le compte principal.
+Ce n'est pas juste une question d'affichage : la base de données elle-même vérifie le rôle (et l'identité du compte principal) avant d'autoriser une modification, directement dans les fonctions SQL (`assign_role`, `remove_role`, `delete_account`, `delete_tournament_archive`). Même si quelqu'un bidouillait le site, il ne pourrait ni changer un rôle sans être admin, ni rétrograder un admin sans être le compte principal, ni supprimer un compte ou un tournoi du Palmarès sauf en étant le compte principal.
 
 ---
 
@@ -244,3 +247,5 @@ git push
 **Import du classement des équipes** (14/08/2026) : plutôt qu'un bouton "connecté à PVS" (pas raisonnable — PVS n'a pas de mot de passe classique, connexion uniquement par Google/lien magique, donc un serveur ne peut pas s'y connecter à ta place) ou qu'une intégration API Claude avec clé secrète (backend à maintenir pour un usage 1x/tournoi, disproportionné), la solution retenue est un **copier-coller de JSON** : tu demandes à un chat IA de ton choix de lire la capture d'écran et de te sortir un JSON, tu le colles dans la section "Importer plusieurs équipes" de l'onglet Inscription (voir section 4). Zéro clé API, zéro backend à maintenir, à voir si on change ça.
 
 **Palmarès** (02/09/2026) : trois choix de conception discutés et tranchés avant de coder — 1) le Palmarès est une **page publique** (pas un onglet admin) puisque c'est un historique que les joueurs ont envie de consulter, comme les autres pages publiques ; 2) la sauvegarde couvre **les deux catégories à la fois** en une seule entrée (un tournoi = un événement, pas deux) — le bouton n'apparaît que quand Hommes ET Femmes sont terminés ; 3) sauvegarder **ne touche pas** aux équipes/poules/matchs en cours — c'est une copie figée en plus, pas un archivage qui vide la base. Techniquement, `tournament_archives.data` stocke une copie complète et autonome des équipes et du tableau des phases finales (pas juste des identifiants) : comme les équipes seront supprimées avant le tournoi suivant, le Palmarès ne peut dépendre d'aucune ligne des tables `teams`/`matches`/`pools` pour rester lisible dans le temps.
+
+**Suppression d'un tournoi du Palmarès** (03/09/2026) : suite à une sauvegarde faite par erreur, ajout d'un droit de suppression réservé au compte principal (voir `delete_tournament_archive` et la section "Le compte principal" en section 6) — même pattern que `delete_account` : bouton visible seulement pour ce compte, et vérification refaite côté SQL pour que ce ne soit pas juste une question d'affichage.
