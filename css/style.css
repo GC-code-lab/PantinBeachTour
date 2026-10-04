@@ -115,9 +115,15 @@ a {
   list-style: none;
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 0.25rem;
   margin: 0;
   padding: 0;
+}
+
+.site-header nav ul li {
+  display: flex;
+  align-items: center;
 }
 
 .site-header nav a {
@@ -138,6 +144,65 @@ a {
 .site-header nav a.active {
   color: var(--color-ocean);
   background: #e6f2fa;
+}
+
+.nav-dropdown {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.nav-dropdown-trigger {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 1.725rem;
+  line-height: 1;
+  padding: 0.4rem 0.85rem;
+  border-radius: var(--radius-pill);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.nav-dropdown-trigger:hover {
+  color: var(--color-text);
+  background: var(--color-bg);
+}
+
+.nav-dropdown-menu {
+  display: none;
+  flex-direction: column;
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 20;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  min-width: 200px;
+  padding: 0.3rem;
+}
+
+.nav-dropdown:hover .nav-dropdown-menu,
+.nav-dropdown:focus-within .nav-dropdown-menu {
+  display: flex;
+}
+
+.nav-dropdown-menu a {
+  display: block;
+  padding: 0.6rem 0.9rem;
+  border-radius: var(--radius);
+  white-space: nowrap;
+  color: var(--color-text);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.nav-dropdown-menu a:hover {
+  background: var(--color-bg);
 }
 
 /* Buttons */
@@ -262,6 +327,53 @@ section {
 }
 
 .category-button.active {
+  background: var(--color-ocean);
+  border-color: var(--color-ocean);
+  color: white;
+}
+
+.gestion-section {
+  margin-top: 1rem;
+}
+
+.format-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+@media (max-width: 600px) {
+  .format-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.format-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 1.5rem 1rem;
+  min-height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-weight: 700;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.format-card:hover {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.format-card.active {
   background: var(--color-ocean);
   border-color: var(--color-ocean);
   color: white;
@@ -591,6 +703,15 @@ section {
   opacity: 0.4;
 }
 
+.qualif-standings-list {
+  padding-left: 1.5rem;
+  margin: 0.5rem 0 0;
+}
+
+.qualif-standings-list li {
+  padding: 0.3rem 0;
+}
+
 .seed-controls {
   display: flex;
   gap: 0.25rem;
@@ -621,7 +742,7 @@ section {
 .generate-buttons {
   display: flex;
   gap: 0.75rem;
-  margin-top: 1rem;
+  margin: 1rem 0;
   flex-wrap: wrap;
 }
 

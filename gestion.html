@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestion du tournoi — Pantin Beach Tour</title>
-  <link rel="stylesheet" href="css/style.css?v=52">
+  <link rel="stylesheet" href="css/style.css?v=59">
 </head>
 <body>
   <header class="site-header">
@@ -22,43 +22,24 @@
   </header>
 
   <main class="container">
-    <h1>Gestion du tournoi</h1>
-
-    <div class="tabs">
-      <button type="button" class="tab-button active" data-tab="tab-compte">Connexion</button>
-      <button type="button" class="tab-button" data-tab="tab-inscription">Inscription des équipes</button>
-      <button type="button" class="tab-button" data-tab="tab-poules">Têtes de série &amp; Poules</button>
-      <button type="button" class="tab-button" data-tab="tab-matchs">Matchs &amp; Résultats</button>
-    </div>
-
-    <div id="tab-compte" class="tab-panel">
-      <section id="roles-section" hidden>
-        <h2>Comptes</h2>
-        <div id="accounts-list"></div>
-
-        <h2>Codes d'inscription automatique</h2>
-        <p>Une personne qui rentre un de ces codes en créant son compte reçoit directement le rôle correspondant, sans que tu aies besoin de lui ajouter.</p>
-        <form id="codes-form" class="form">
-          <div class="player-row">
-            <div>
-              <label for="admin-code">Code Admin</label>
-              <input type="text" id="admin-code" name="admin-code">
-            </div>
-            <div>
-              <label for="scorer-code">Code Scorer</label>
-              <input type="text" id="scorer-code" name="scorer-code">
-            </div>
-          </div>
-
-          <button type="submit" class="button">Enregistrer les codes</button>
-        </form>
-        <p id="codes-message" class="form-message"></p>
-      </section>
-
-      <div class="account-bar">
-        <p>Connecté en tant que <strong id="admin-email-display"></strong></p>
-        <button id="logout-button" class="button button-sm">Se déconnecter</button>
+    <div id="section-gestion" class="gestion-section">
+      <div class="tabs">
+        <button type="button" class="tab-button active" data-tab="tab-formule">Formule</button>
+        <button type="button" class="tab-button" data-tab="tab-inscription">Inscription des équipes</button>
+        <button type="button" class="tab-button" data-tab="tab-poules">Têtes de série &amp; Poules</button>
+        <button type="button" class="tab-button" data-tab="tab-matchs">Matchs &amp; Résultats</button>
       </div>
+
+    <div id="tab-formule" class="tab-panel">
+      <section>
+        <h2>Formule du tournoi</h2>
+        <div class="format-grid">
+          <button type="button" class="format-card" data-format="12">12 équipes</button>
+          <button type="button" class="format-card" data-format="16">16 équipes</button>
+          <button type="button" class="format-card" data-format="12-quali16">12 équipes (qualifs 16)</button>
+        </div>
+        <p id="format-message" class="form-message"></p>
+      </section>
     </div>
 
     <div id="tab-inscription" class="tab-panel" hidden>
@@ -159,8 +140,11 @@
         <div class="generate-buttons">
           <button id="generate-12" type="button" class="button">Générer 4 poules de 3 (12 équipes)</button>
           <button id="generate-16" type="button" class="button">Générer 4 poules de 4 (16 équipes)</button>
+          <button id="generate-qualif-pools-button" type="button" class="button" hidden>Générer les poules de qualification (16 équipes)</button>
         </div>
         <p id="generate-message" class="form-message"></p>
+
+        <div id="qualif-seed-preview" hidden></div>
 
         <div id="pools-list"></div>
       </section>
@@ -171,6 +155,21 @@
         <button type="button" class="category-button active" data-category="Hommes">Hommes</button>
         <button type="button" class="category-button" data-category="Femmes">Femmes</button>
       </div>
+
+      <section id="qualif-section" hidden>
+        <h2>Qualifications</h2>
+        <p id="qualif-info" class="form-message"></p>
+        <div id="qualif-pools-list"></div>
+
+        <div class="generate-buttons">
+          <button id="generate-qualif-barrages-button" type="button" class="button" hidden>Générer les barrages de qualification</button>
+        </div>
+        <div id="qualif-barrages-list"></div>
+
+        <div class="generate-buttons">
+          <button id="generate-maindraw-button" type="button" class="button" hidden>Générer les poules du Maindraw</button>
+        </div>
+      </section>
 
       <section>
         <h2>Matchs de poule</h2>
@@ -213,6 +212,37 @@
         <p id="archive-message" class="form-message"></p>
       </section>
     </div>
+    </div>
+
+    <div id="section-compte" class="gestion-section" hidden>
+      <section id="roles-section" hidden>
+        <h2>Comptes</h2>
+        <div id="accounts-list"></div>
+
+        <h2>Codes d'inscription automatique</h2>
+        <p>Une personne qui rentre un de ces codes en créant son compte reçoit directement le rôle correspondant, sans que tu aies besoin de lui ajouter.</p>
+        <form id="codes-form" class="form">
+          <div class="player-row">
+            <div>
+              <label for="admin-code">Code Admin</label>
+              <input type="text" id="admin-code" name="admin-code">
+            </div>
+            <div>
+              <label for="scorer-code">Code Scorer</label>
+              <input type="text" id="scorer-code" name="scorer-code">
+            </div>
+          </div>
+
+          <button type="submit" class="button">Enregistrer les codes</button>
+        </form>
+        <p id="codes-message" class="form-message"></p>
+      </section>
+
+      <div class="account-bar">
+        <p>Connecté en tant que <strong id="admin-email-display"></strong></p>
+        <button id="logout-button" class="button button-sm">Se déconnecter</button>
+      </div>
+    </div>
   </main>
 
   <footer class="site-footer">
@@ -224,7 +254,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js?v=1"></script>
-  <script src="js/nav.js?v=1"></script>
-  <script src="js/gestion.js?v=53"></script>
+  <script src="js/nav.js?v=3"></script>
+  <script src="js/gestion.js?v=69"></script>
 </body>
 </html>

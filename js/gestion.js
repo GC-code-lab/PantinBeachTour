@@ -1,3 +1,16 @@
+// Les 2 "sections" de la page (Gestion du tournoi / Connexion) sont choisies
+// depuis le menu "⚙" du bandeau commun (voir js/nav.js), pas depuis cette page :
+// un lien classique vers gestion.html (section par défaut) ou gestion.html#compte.
+// On lit juste le hash au chargement, et on réagit s'il change sans rechargement
+// (ex: on est déjà sur gestion.html et on reclique "Connexion" dans le menu).
+function applySectionFromHash() {
+  const showCompte = window.location.hash === "#compte";
+  document.getElementById("section-gestion").hidden = showCompte;
+  document.getElementById("section-compte").hidden = !showCompte;
+}
+applySectionFromHash();
+window.addEventListener("hashchange", applySectionFromHash);
+
 const tabButtons = document.querySelectorAll(".tab-button");
 const tabPanels = document.querySelectorAll(".tab-panel");
 
@@ -35,6 +48,7 @@ const rolesSection = document.getElementById("roles-section");
 const inscriptionTabButton = document.querySelector('.tab-button[data-tab="tab-inscription"]');
 const poulesTabButton = document.querySelector('.tab-button[data-tab="tab-poules"]');
 const matchsTabButton = document.querySelector('.tab-button[data-tab="tab-matchs"]');
+const formuleTabButton = document.querySelector('.tab-button[data-tab="tab-formule"]');
 
 logoutButton.addEventListener("click", async () => {
   await supabaseClient.auth.signOut();
@@ -46,16 +60,28 @@ logoutButton.addEventListener("click", async () => {
 // Le bouton "Sauvegarde du tournoi" (Palmarès) est réservé aux admins, comme les
 // autres actions structurantes du site (inscriptions, poules) — un scorer ne le voit
 // jamais, même une fois le tournoi terminé.
+//
+// Avant même le rôle : tant qu'aucune formule n'a été choisie pour le tournoi, seuls
+// les onglets "Connexion" et "Formule" existent — Inscription/Poules/Matchs restent
+// cachés même pour un admin. Choisir une formule (voir plus bas) fait apparaître le
+// reste d'un coup : c'est ce choix qui "ouvre" la gestion du tournoi.
 let isAdminRole = false;
+let hasAccessRole = false;
+
+function applyTabVisibility() {
+  const formatChosen = currentFormat !== null;
+  inscriptionTabButton.hidden = !(isAdminRole && formatChosen);
+  poulesTabButton.hidden = !(isAdminRole && formatChosen);
+  matchsTabButton.hidden = !(hasAccessRole && formatChosen);
+  formuleTabButton.hidden = !isAdminRole;
+}
 
 function applyRoleUI(role) {
   const isAdmin = role === "admin";
   isAdminRole = isAdmin;
-  const hasAccess = role === "admin" || role === "scorer";
-  inscriptionTabButton.hidden = !isAdmin;
-  poulesTabButton.hidden = !isAdmin;
-  matchsTabButton.hidden = !hasAccess;
+  hasAccessRole = role === "admin" || role === "scorer";
   rolesSection.hidden = !isAdmin;
+  applyTabVisibility();
   if (isAdmin) {
     loadAccountsList();
     loadSignupCodes();
@@ -78,7 +104,87 @@ supabaseClient.auth.onAuthStateChange(async (_event, session) => {
     .maybeSingle();
   applyRoleUI(profile ? profile.role : null);
 
+  loadTournamentFormats();
   loadAdminData();
+});
+
+// Formule du tournoi (12, 16, ou 12-quali16 pour l'instant — d'autres formules
+// pourront s'ajouter plus tard). Une seule formule pour tout le tournoi, Hommes
+// et Femmes confondus. `currentFormat === null` tant qu'aucune formule n'a encore
+// été choisie (table `tournament_formats` vide) : c'est cet état qui garde les
+// onglets Inscription/Poules/Matchs cachés, voir applyTabVisibility ci-dessus.
+const formatButtons = document.querySelectorAll(".format-card");
+const formatMessage = document.getElementById("format-message");
+let currentFormat = null;
+
+async function loadTournamentFormats() {
+  const { data, error } = await supabaseClient.from("tournament_formats").select("*").maybeSingle();
+  if (error || !data) return;
+
+  currentFormat = data.format;
+  renderFormatButtons();
+  applyTabVisibility();
+}
+
+function renderFormatButtons() {
+  formatButtons.forEach((button) => {
+    button.classList.toggle("active", button.dataset.format === currentFormat);
+  });
+}
+
+formatButtons.forEach((button) => {
+  button.addEventListener("click", async () => {
+    const format = button.dataset.format;
+    if (format === currentFormat) return;
+
+    // Bloqué dès qu'un score existe (n'importe quelle catégorie/phase) : au-delà de
+    // ce point, changer de formule n'aurait plus de sens (le tournoi est en cours).
+    const { count: setsCount, error: setsError } = await supabaseClient
+      .from("sets")
+      .select("id", { count: "exact", head: true });
+
+    if (setsError) {
+      formatMessage.textContent = "Erreur : " + setsError.message;
+      formatMessage.style.color = "var(--color-coral)";
+      return;
+    }
+
+    if (setsCount > 0) {
+      alert("Impossible de changer de formule : des scores ont déjà été saisis pour ce tournoi.");
+      return;
+    }
+
+    // Pas de score encore : on peut changer de formule librement. Les poules/matchs
+    // des deux catégories sont réinitialisés (ils dépendent du nombre d'équipes
+    // attendu par la formule), mais les équipes déjà inscrites restent — pas besoin
+    // de les réinscrire après coup. resetPools ne touche jamais à la table `teams`.
+    if (currentFormat !== null) {
+      const confirmed = confirm(
+        "Changer de formule réinitialise les poules et matchs en cours, pour les deux catégories. Les équipes déjà inscrites restent, mais il faudra régénérer les poules. Continuer ?"
+      );
+      if (!confirmed) return;
+
+      await resetPools("Hommes");
+      await resetPools("Femmes");
+    }
+
+    const { error } = await supabaseClient
+      .from("tournament_formats")
+      .upsert({ id: 1, format });
+
+    if (error) {
+      formatMessage.textContent = "Erreur : " + error.message;
+      formatMessage.style.color = "var(--color-coral)";
+      return;
+    }
+
+    currentFormat = format;
+    renderFormatButtons();
+    applyTabVisibility();
+    formatMessage.textContent = "Formule enregistrée.";
+    formatMessage.style.color = "var(--color-ocean-dark)";
+    loadAdminData();
+  });
 });
 
 const accountsList = document.getElementById("accounts-list");
@@ -433,7 +539,9 @@ const selectedTeamIds = new Set();
 const seedingList = document.getElementById("seeding-list");
 const generate12Button = document.getElementById("generate-12");
 const generate16Button = document.getElementById("generate-16");
+const generateQualifPoolsButton = document.getElementById("generate-qualif-pools-button");
 const generateMessage = document.getElementById("generate-message");
+const qualifSeedPreview = document.getElementById("qualif-seed-preview");
 
 let seedTeams = [];
 let allTeams = [];
@@ -489,7 +597,12 @@ async function loadAdminData() {
     .in("phase", ["barrage", "quart", "demi", "petite_finale", "finale"])
     .order("slot");
 
-  if (poolsError || teamsError || matchesError || bracketError) {
+  const { data: qualifMatches, error: qualifError } = await supabaseClient
+    .from("matches")
+    .select("*, sets(*)")
+    .in("phase", ["qualif_poule", "qualif_barrage1", "qualif_barrage2"]);
+
+  if (poolsError || teamsError || matchesError || bracketError || qualifError) {
     poolsList.textContent = "Erreur de chargement des données.";
     return;
   }
@@ -501,13 +614,15 @@ async function loadAdminData() {
   const categoryTeams = teams.filter((team) => team.category === currentCategory);
   const categoryMatches = matches.filter((match) => match.category === currentCategory);
   const categoryBracketMatches = bracketMatches.filter((match) => match.category === currentCategory);
+  const categoryQualifMatches = qualifMatches.filter((match) => match.category === currentCategory);
 
   renderPools(categoryPools, categoryTeams);
-  renderGenerateControls(categoryTeams.length);
-  renderMatchesTab(categoryPools, categoryTeams, categoryMatches);
-  renderBracketTab(categoryPools, categoryTeams, categoryMatches, categoryBracketMatches);
   seedTeams = defaultSeedOrder(categoryTeams);
   renderSeedingList();
+  renderGenerateControls(categoryTeams.length);
+  renderQualifSection(categoryTeams, categoryQualifMatches);
+  renderMatchesTab(categoryPools, categoryTeams, categoryMatches);
+  renderBracketTab(categoryPools, categoryTeams, categoryMatches, categoryBracketMatches);
 
   // Indépendant de currentCategory : le bouton "Sauvegarde du tournoi" exige que
   // les DEUX catégories soient terminées, pas seulement celle affichée.
@@ -530,14 +645,80 @@ async function resetPools(category) {
   await supabaseClient.from("pools").delete().eq("category", category);
 }
 
-function renderGenerateControls(count) {
-  generate12Button.hidden = count !== 12;
-  generate16Button.hidden = count !== 16;
+// Version "chirurgicale" de resetPools, réservée à la formule "12-quali16" :
+// ne touche qu'au Maindraw (pools "Poule A-D" + leurs matchs), jamais aux matchs
+// de qualif (phase qualif_*, pool_id toujours null) — pour pouvoir régénérer le
+// Maindraw sans perdre l'historique des qualifs déjà jouées.
+async function resetMaindraw(category) {
+  const { data: categoryPools } = await supabaseClient.from("pools").select("id").eq("category", category);
+  const categoryPoolIds = (categoryPools || []).map((pool) => pool.id);
 
-  generateMessage.textContent =
-    count === 12 || count === 16
-      ? ""
-      : `La catégorie ${currentCategory} doit compter 12 ou 16 équipes pour générer les poules (actuellement ${count}).`;
+  if (categoryPoolIds.length > 0) {
+    await supabaseClient.from("matches").delete().in("pool_id", categoryPoolIds);
+  }
+  await supabaseClient
+    .from("matches")
+    .delete()
+    .eq("category", category)
+    .is("pool_id", null)
+    .in("phase", ["barrage", "quart", "demi", "petite_finale", "finale"]);
+  await supabaseClient.from("teams").update({ pool_id: null }).eq("category", category);
+  await supabaseClient.from("pools").delete().eq("category", category);
+}
+
+// Supprime uniquement les matchs de qualif (les équipes n'ont jamais de pool_id
+// pendant les qualifs dans ce format — voir generateQualifPools).
+async function resetQualif(category) {
+  await supabaseClient
+    .from("matches")
+    .delete()
+    .eq("category", category)
+    .in("phase", ["qualif_poule", "qualif_barrage1", "qualif_barrage2"]);
+}
+
+function renderGenerateControls(count) {
+  const isQuali16 = currentFormat === "12-quali16";
+
+  generate12Button.hidden = isQuali16 || count !== 12;
+  generate16Button.hidden = isQuali16 || count !== 16;
+  generateQualifPoolsButton.hidden = !isQuali16 || count !== 24;
+  qualifSeedPreview.hidden = !isQuali16;
+
+  if (isQuali16) {
+    generateMessage.textContent =
+      count === 24 ? "" : `La catégorie ${currentCategory} doit compter 24 équipes pour générer les poules de qualification (actuellement ${count}).`;
+    renderQualifSeedPreview();
+  } else {
+    generateMessage.textContent = "";
+  }
+}
+
+// Aperçu informatif (pas d'écriture en base) : qui serait "direct" en Maindraw
+// (les 8 meilleures têtes de série) et qui jouerait les qualifs (les 16 suivantes),
+// d'après le classement actuel — recalculé à chaque rendu, jamais persisté tel quel.
+function renderQualifSeedPreview() {
+  qualifSeedPreview.innerHTML = "";
+
+  const direct = seedTeams.slice(0, 8);
+  const qualif = seedTeams.slice(8, 24);
+
+  const makeList = (title, teams) => {
+    const wrap = document.createElement("div");
+    const heading = document.createElement("h3");
+    heading.textContent = title;
+    wrap.appendChild(heading);
+    const list = document.createElement("ul");
+    teams.forEach((team) => {
+      const item = document.createElement("li");
+      item.textContent = formatTeamDetailWithPoints(team);
+      list.appendChild(item);
+    });
+    wrap.appendChild(list);
+    return wrap;
+  };
+
+  qualifSeedPreview.appendChild(makeList(`Direct Maindraw (${direct.length}/8)`, direct));
+  qualifSeedPreview.appendChild(makeList(`Qualifications (${qualif.length}/16)`, qualif));
 }
 
 function renderTeamsList(teams) {
@@ -746,6 +927,58 @@ function snakeAssign(orderedTeams, poolCount) {
   return groups;
 }
 
+// Crée les 4 "Poule A-D" (Maindraw) à partir d'une liste d'équipes déjà
+// ordonnée (tête de série la plus haute en premier), les répartit en serpentin,
+// assigne pool_id, et génère les matchs de poule (méthode du cercle). Partagé
+// entre generatePools (formules 12/16 classiques) et generateMaindrawFromQualif
+// (formule "12-quali16", une fois les qualifs terminées).
+async function createMaindrawPoolsAndMatches(teamsInOrder, category) {
+  const poolLabels = ["Poule A", "Poule B", "Poule C", "Poule D"];
+  const groups = snakeAssign(teamsInOrder, 4);
+  const matchRows = [];
+
+  for (let i = 0; i < poolLabels.length; i++) {
+    const { data: pool, error: poolError } = await supabaseClient
+      .from("pools")
+      .insert({ label: poolLabels[i], category })
+      .select()
+      .single();
+    if (poolError) {
+      alert("Erreur lors de la création des poules : " + poolError.message);
+      return;
+    }
+
+    const teamIds = groups[i].map((team) => team.id);
+    if (teamIds.length > 0) {
+      const { error: assignError } = await supabaseClient
+        .from("teams")
+        .update({ pool_id: pool.id })
+        .in("id", teamIds);
+      if (assignError) {
+        alert("Erreur lors de l'affectation des équipes aux poules : " + assignError.message);
+        return;
+      }
+    }
+    poolRoundRobin(teamIds).forEach(([team1Id, team2Id]) => {
+      matchRows.push({
+        phase: "poule",
+        category,
+        pool_id: pool.id,
+        team1_id: team1Id,
+        team2_id: team2Id,
+        status: "a_venir",
+      });
+    });
+  }
+
+  if (matchRows.length > 0) {
+    const { error: matchesError } = await supabaseClient.from("matches").insert(matchRows);
+    if (matchesError) {
+      alert("Erreur lors de la génération des matchs de poule : " + matchesError.message);
+    }
+  }
+}
+
 async function generatePools(teamCount) {
   if (seedTeams.length < teamCount) {
     alert(`Il faut au moins ${teamCount} équipes classées (catégorie ${currentCategory}) pour générer ce tableau.`);
@@ -757,50 +990,182 @@ async function generatePools(teamCount) {
   );
   if (!confirmed) return;
 
-  const poolLabels = ["Poule A", "Poule B", "Poule C", "Poule D"];
-
   await resetPools(currentCategory);
-
-  const poolByLabel = {};
-  for (const label of poolLabels) {
-    const { data } = await supabaseClient.from("pools").insert({ label, category: currentCategory }).select().single();
-    poolByLabel[label] = data;
-  }
-
-  const topTeams = seedTeams.slice(0, teamCount);
-  const groups = snakeAssign(topTeams, 4);
-
-  // Les matchs de poule découlent directement de la composition des poules :
-  // pas besoin d'une étape manuelle séparée, on les génère dans la foulée.
-  const matchRows = [];
-
-  for (let i = 0; i < poolLabels.length; i++) {
-    const pool = poolByLabel[poolLabels[i]];
-    const teamIds = groups[i].map((team) => team.id);
-    if (teamIds.length > 0) {
-      await supabaseClient.from("teams").update({ pool_id: pool.id }).in("id", teamIds);
-    }
-    poolRoundRobin(teamIds).forEach(([team1Id, team2Id]) => {
-      matchRows.push({
-        phase: "poule",
-        category: currentCategory,
-        pool_id: pool.id,
-        team1_id: team1Id,
-        team2_id: team2Id,
-        status: "a_venir",
-      });
-    });
-  }
-
-  if (matchRows.length > 0) {
-    await supabaseClient.from("matches").insert(matchRows);
-  }
-
+  await createMaindrawPoolsAndMatches(seedTeams.slice(0, teamCount), currentCategory);
   loadAdminData();
 }
 
 generate12Button.addEventListener("click", () => generatePools(12));
 generate16Button.addEventListener("click", () => generatePools(16));
+
+// Vainqueur/perdant d'un match tranché (il faut 2 sets gagnés) — utilisé pour
+// dépouiller les qualifs (poules brésiliennes et barrages de qualif).
+function matchWinnerLoser(match) {
+  const sets = (match && match.sets) || [];
+  const wins1 = sets.filter((s) => s.score_team1 > s.score_team2).length;
+  const wins2 = sets.filter((s) => s.score_team2 > s.score_team1).length;
+  if (wins1 > wins2) return { winnerId: match.team1_id, loserId: match.team2_id };
+  return { winnerId: match.team2_id, loserId: match.team1_id };
+}
+
+// Formule "12-quali16" — étape 1 : les 24 équipes classées sont scindées en 8
+// "direct Maindraw" (têtes de série 1-8) et 16 "qualifs" (9-24). Les 16 de qualif
+// sont réparties en serpentin dans 4 poules brésiliennes (A-D) : tour 1 = 1v4 et
+// 2v3, tour 2 (vainqueurs entre eux / perdants entre eux) créé en même temps,
+// équipes à null, rempli automatiquement via BRACKET_PROGRESSION quand le tour 1
+// est noté. Contrairement au Maindraw, ces poules de qualif ne sont pas des
+// lignes de la table `pools` ni posées sur teams.pool_id — seules les 4 lettres
+// (encodées dans le `slot`) portent le regroupement, pour ne jamais interférer
+// avec les contrôles qui comptent "4 poules" côté Maindraw (generateBracketButton).
+async function generateQualifPools() {
+  if (seedTeams.length < 24) {
+    alert(`Il faut au moins 24 équipes classées (catégorie ${currentCategory}) pour générer les poules de qualification.`);
+    return;
+  }
+
+  const confirmed = confirm(
+    `Générer les poules de qualification ${currentCategory} avec les 16 équipes de qualification (les 8 meilleures têtes de série vont direct en Maindraw) ? Les qualifications et le Maindraw actuels de cette catégorie seront réinitialisés.`
+  );
+  if (!confirmed) return;
+
+  await resetQualif(currentCategory);
+  await resetMaindraw(currentCategory);
+
+  const top24 = seedTeams.slice(0, 24);
+  const qualifTeams = top24.slice(8, 24);
+  const groups = snakeAssign(qualifTeams, 4);
+  const letters = ["A", "B", "C", "D"];
+
+  const matchRows = [];
+  letters.forEach((letter, i) => {
+    const teams = groups[i];
+    matchRows.push({ phase: "qualif_poule", slot: `q${letter}-r1-1`, category: currentCategory, team1_id: teams[0].id, team2_id: teams[3].id, status: "a_venir" });
+    matchRows.push({ phase: "qualif_poule", slot: `q${letter}-r1-2`, category: currentCategory, team1_id: teams[1].id, team2_id: teams[2].id, status: "a_venir" });
+    matchRows.push({ phase: "qualif_poule", slot: `q${letter}-r2-w`, category: currentCategory, team1_id: null, team2_id: null, status: "a_venir" });
+    matchRows.push({ phase: "qualif_poule", slot: `q${letter}-r2-l`, category: currentCategory, team1_id: null, team2_id: null, status: "a_venir" });
+  });
+
+  const { error: insertError } = await supabaseClient.from("matches").insert(matchRows);
+  if (insertError) {
+    alert("Erreur lors de la génération des poules de qualification : " + insertError.message);
+    return;
+  }
+  loadAdminData();
+}
+
+generateQualifPoolsButton.addEventListener("click", generateQualifPools);
+
+// Formule "12-quali16" — étape 2 : une fois les 16 matchs de poule brésilienne
+// notés, le classement 1-2-3-4 de chaque poule qualif se lit directement sur le
+// tour 2 (vainqueur du match des vainqueurs = 1er, perdant de ce match = 2e,
+// vainqueur du match des perdants = 3e, perdant de ce match = 4e — un bracket
+// brésilienne est toujours tranché, pas besoin de différentiel de points).
+async function generateQualifBarrages() {
+  const { data: pouleMatches, error } = await supabaseClient
+    .from("matches")
+    .select("*, sets(*)")
+    .eq("category", currentCategory)
+    .eq("phase", "qualif_poule");
+  if (error) {
+    alert("Erreur : " + error.message);
+    return;
+  }
+
+  if (!pouleMatches || pouleMatches.length !== 16 || pouleMatches.some((m) => !m.sets || m.sets.length === 0)) {
+    alert("Tous les matchs des poules de qualification (tour 1 et tour 2) doivent avoir un score.");
+    return;
+  }
+
+  const bySlot = new Map(pouleMatches.map((m) => [m.slot, m]));
+  const standings = {};
+  ["A", "B", "C", "D"].forEach((letter) => {
+    const roundWinners = matchWinnerLoser(bySlot.get(`q${letter}-r2-w`));
+    const roundLosers = matchWinnerLoser(bySlot.get(`q${letter}-r2-l`));
+    standings[letter] = [roundWinners.winnerId, roundWinners.loserId, roundLosers.winnerId, roundLosers.loserId];
+  });
+
+  const confirmed = confirm(
+    `Générer les barrages de qualification ${currentCategory} ? Les barrages de qualification existants pour cette catégorie seront remplacés.`
+  );
+  if (!confirmed) return;
+
+  await supabaseClient
+    .from("matches")
+    .delete()
+    .eq("category", currentCategory)
+    .in("phase", ["qualif_barrage1", "qualif_barrage2"]);
+
+  const first = (letter) => standings[letter][0];
+  const second = (letter) => standings[letter][1];
+  const third = (letter) => standings[letter][2];
+
+  const rows = [
+    { phase: "qualif_barrage1", slot: "qb1", category: currentCategory, team1_id: second("A"), team2_id: third("C"), status: "a_venir" },
+    { phase: "qualif_barrage1", slot: "qb2", category: currentCategory, team1_id: second("B"), team2_id: third("D"), status: "a_venir" },
+    { phase: "qualif_barrage1", slot: "qb3", category: currentCategory, team1_id: second("C"), team2_id: third("A"), status: "a_venir" },
+    { phase: "qualif_barrage1", slot: "qb4", category: currentCategory, team1_id: second("D"), team2_id: third("B"), status: "a_venir" },
+    { phase: "qualif_barrage2", slot: "qb5", category: currentCategory, team1_id: first("A"), team2_id: null, status: "a_venir" },
+    { phase: "qualif_barrage2", slot: "qb6", category: currentCategory, team1_id: first("B"), team2_id: null, status: "a_venir" },
+    { phase: "qualif_barrage2", slot: "qb7", category: currentCategory, team1_id: first("C"), team2_id: null, status: "a_venir" },
+    { phase: "qualif_barrage2", slot: "qb8", category: currentCategory, team1_id: first("D"), team2_id: null, status: "a_venir" },
+  ];
+
+  const { error: insertError } = await supabaseClient.from("matches").insert(rows);
+  if (insertError) {
+    alert("Erreur lors de la génération des barrages de qualification : " + insertError.message);
+    return;
+  }
+  loadAdminData();
+}
+
+// Formule "12-quali16" — étape 3 : une fois les 4 barrages du 2e tour (qb5-qb8)
+// notés, leurs vainqueurs sont les 4 qualifiés. Avec les 8 équipes "direct" (têtes
+// de série 1-8, recalculées depuis le classement actuel), ça fait les 12 équipes
+// du Maindraw — reclassées par POINTS (pas par tête de série) puis réparties en
+// serpentin, exactement comme generatePools.
+async function generateMaindrawFromQualif() {
+  const { data: barrage2Matches, error } = await supabaseClient
+    .from("matches")
+    .select("*, sets(*)")
+    .eq("category", currentCategory)
+    .eq("phase", "qualif_barrage2");
+  if (error) {
+    alert("Erreur : " + error.message);
+    return;
+  }
+
+  if (!barrage2Matches || barrage2Matches.length !== 4 || barrage2Matches.some((m) => !m.sets || m.sets.length === 0)) {
+    alert("Les 4 barrages de qualification (2e tour) doivent tous avoir un score.");
+    return;
+  }
+
+  const qualifierIds = barrage2Matches.map((match) => matchWinnerLoser(match).winnerId);
+
+  const { data: qualifierTeams, error: teamsError } = await supabaseClient
+    .from("teams")
+    .select("*")
+    .in("id", qualifierIds);
+  if (teamsError) {
+    alert("Erreur : " + teamsError.message);
+    return;
+  }
+
+  const directTeams = seedTeams.slice(0, 8);
+  const maindrawTeams = [...directTeams, ...qualifierTeams].sort((a, b) => {
+    const diff = teamPoints(b) - teamPoints(a);
+    if (diff !== 0) return diff;
+    return new Date(a.created_at) - new Date(b.created_at);
+  });
+
+  const confirmed = confirm(
+    `Générer les 4 poules du Maindraw ${currentCategory} avec les 8 équipes direct + les 4 équipes qualifiées ? Les poules du Maindraw existantes pour cette catégorie seront remplacées.`
+  );
+  if (!confirmed) return;
+
+  await resetMaindraw(currentCategory);
+  await createMaindrawPoolsAndMatches(maindrawTeams, currentCategory);
+  loadAdminData();
+}
 
 const matchesInfo = document.getElementById("matches-info");
 const matchesList = document.getElementById("matches-list");
@@ -848,6 +1213,22 @@ const BRACKET_PROGRESSION = {
     winner: { nextSlot: "finale", position: "team2_id" },
     loser: { nextSlot: "petite-finale", position: "team2_id" },
   },
+
+  // Formule "12-quali16" : poules de qualif en poule brésilienne (tour 1 = 1v4/2v3,
+  // tour 2 = vainqueurs entre eux pour les places 1-2, perdants entre eux pour 3-4),
+  // puis 2 tours de barrages de qualif (voir generateQualifBarrages).
+  "qA-r1-1": { winner: { nextSlot: "qA-r2-w", position: "team1_id" }, loser: { nextSlot: "qA-r2-l", position: "team1_id" } },
+  "qA-r1-2": { winner: { nextSlot: "qA-r2-w", position: "team2_id" }, loser: { nextSlot: "qA-r2-l", position: "team2_id" } },
+  "qB-r1-1": { winner: { nextSlot: "qB-r2-w", position: "team1_id" }, loser: { nextSlot: "qB-r2-l", position: "team1_id" } },
+  "qB-r1-2": { winner: { nextSlot: "qB-r2-w", position: "team2_id" }, loser: { nextSlot: "qB-r2-l", position: "team2_id" } },
+  "qC-r1-1": { winner: { nextSlot: "qC-r2-w", position: "team1_id" }, loser: { nextSlot: "qC-r2-l", position: "team1_id" } },
+  "qC-r1-2": { winner: { nextSlot: "qC-r2-w", position: "team2_id" }, loser: { nextSlot: "qC-r2-l", position: "team2_id" } },
+  "qD-r1-1": { winner: { nextSlot: "qD-r2-w", position: "team1_id" }, loser: { nextSlot: "qD-r2-l", position: "team1_id" } },
+  "qD-r1-2": { winner: { nextSlot: "qD-r2-w", position: "team2_id" }, loser: { nextSlot: "qD-r2-l", position: "team2_id" } },
+  "qb1": { winner: { nextSlot: "qb6", position: "team2_id" } },
+  "qb2": { winner: { nextSlot: "qb5", position: "team2_id" } },
+  "qb3": { winner: { nextSlot: "qb8", position: "team2_id" } },
+  "qb4": { winner: { nextSlot: "qb7", position: "team2_id" } },
 };
 
 function requiredSetWins(phase) {
@@ -856,10 +1237,13 @@ function requiredSetWins(phase) {
 
 // Points à atteindre pour gagner un set donné, selon la phase (règles du tournoi,
 // voir section 7 du GUIDE.md) : poule = 21 ; barrage = 15 (tie-break 11) ;
-// quart/demi/petite finale/finale = 21 (tie-break 15).
+// quart/demi/petite finale/finale = 21 (tie-break 15) — SAUF en formule
+// "12-quali16", où tout le Maindraw (hors poules) se joue en 15 (tie-break 11),
+// comme les qualifs (poules brésiliennes et barrages de qualif, toujours 15/11).
 function setTargetPoints(phase, setNumber) {
   if (phase === "poule") return 21;
-  if (phase === "barrage") return setNumber === 3 ? 11 : 15;
+  if (phase === "barrage" || phase.startsWith("qualif_")) return setNumber === 3 ? 11 : 15;
+  if (currentFormat === "12-quali16") return setNumber === 3 ? 11 : 15;
   return setNumber === 3 ? 15 : 21;
 }
 
@@ -873,6 +1257,60 @@ function isValidSetScore(target, score1, score2) {
   if (winner - loser < 2) return false;
   if (winner > target && winner - loser !== 2) return false;
   return true;
+}
+
+// Vide le score d'un match déjà joué (tous les champs effacés puis "Enregistrer") :
+// supprime ses sets et le remet "a_venir". Si ce match avait déjà fait avancer une
+// équipe au tour suivant (BRACKET_PROGRESSION), ça défait aussi cette propagation —
+// sauf si le match suivant a déjà été joué avec cette équipe, auquel cas on bloque
+// (il faut d'abord effacer SON score, en remontant le tableau pas à pas).
+async function clearMatchSets(match) {
+  const progression = BRACKET_PROGRESSION[match.slot];
+  const nextSlots = progression
+    ? [progression.winner, progression.loser].filter(Boolean).map((p) => p.nextSlot)
+    : [];
+
+  if (nextSlots.length > 0) {
+    const { data: nextMatches, error } = await supabaseClient
+      .from("matches")
+      .select("*, sets(*)")
+      .eq("category", match.category)
+      .in("slot", nextSlots);
+    if (error) {
+      alert("Erreur : " + error.message);
+      return;
+    }
+    const alreadyPlayed = (nextMatches || []).some((m) => m.sets && m.sets.length > 0);
+    if (alreadyPlayed) {
+      alert(
+        "Impossible d'effacer ce score : le match suivant a déjà été joué avec l'équipe issue de ce match. Efface d'abord son score à lui."
+      );
+      return;
+    }
+  }
+
+  await supabaseClient.from("sets").delete().eq("match_id", match.id);
+  await supabaseClient.from("matches").update({ status: "a_venir" }).eq("id", match.id);
+
+  if (progression) {
+    if (progression.winner) {
+      await supabaseClient
+        .from("matches")
+        .update({ [progression.winner.position]: null })
+        .eq("slot", progression.winner.nextSlot)
+        .eq("category", match.category);
+    }
+    if (progression.loser) {
+      await supabaseClient
+        .from("matches")
+        .update({ [progression.loser.position]: null })
+        .eq("slot", progression.loser.nextSlot)
+        .eq("category", match.category);
+    }
+  }
+
+  [1, 2, 3].forEach((setNumber) => draftScores.delete(`${match.id}-${setNumber}`));
+  loadAdminData();
 }
 
 // Enregistre les sets saisis (les sets laissés vides sont ignorés), détermine si le match
@@ -1025,19 +1463,32 @@ function collectEnteredSets(setInputs, phase) {
 // sur une seule ligne. Les matchs de poule ont 1 set ; les autres en ont 2, avec un 3e
 // (tie-break) qui n'apparaît que si les deux premiers sets sont à 1-1.
 // Tant que les deux équipes ne sont pas connues (barrage pas encore joué), on affiche
-// juste "À déterminer" à la place du formulaire de score.
-function createMatchRow(match, teamsById) {
+// juste "À déterminer" à la place du formulaire de score — sauf si `options.placeholders`
+// fournit un texte plus précis (ex: "Vainqueur du Barrage 2") pour ce match précis.
+// `options.label` ajoute en plus une étiquette devant le match (ex: "Barrage 3"),
+// utile quand il faut pouvoir citer un match précis par son numéro (barrages de qualif).
+function createMatchRow(match, teamsById, options = {}) {
+  const { label, placeholders = {} } = options;
   const bothTeamsKnown = Boolean(match.team1_id && match.team2_id);
   const isMultiSet = match.phase !== "poule";
   const setsByNumber = new Map((match.sets || []).map((s) => [s.set_number, s]));
   const setInputs = [];
+  const team1Label = match.team1_id ? teamLabel(match.team1_id, teamsById) : placeholders.team1 || "À déterminer";
+  const team2Label = match.team2_id ? teamLabel(match.team2_id, teamsById) : placeholders.team2 || "À déterminer";
 
   const row = document.createElement("div");
   row.className = match.status === "termine" ? "match-row match-row-done" : "match-row";
 
+  if (label) {
+    const orderTag = document.createElement("span");
+    orderTag.className = "match-order-tag";
+    orderTag.textContent = label;
+    row.appendChild(orderTag);
+  }
+
   const team1Span = document.createElement("span");
   team1Span.className = "match-team";
-  team1Span.textContent = teamLabel(match.team1_id, teamsById);
+  team1Span.textContent = team1Label;
 
   if (!isMultiSet) {
     row.appendChild(team1Span);
@@ -1060,7 +1511,7 @@ function createMatchRow(match, teamsById) {
 
     const team2Span = document.createElement("span");
     team2Span.className = "match-team team2";
-    team2Span.textContent = teamLabel(match.team2_id, teamsById);
+    team2Span.textContent = team2Label;
     teamsGroup.appendChild(team2Span);
 
     row.appendChild(teamsGroup);
@@ -1106,7 +1557,7 @@ function createMatchRow(match, teamsById) {
   if (!isMultiSet) {
     const team2Span = document.createElement("span");
     team2Span.className = "match-team team2";
-    team2Span.textContent = teamLabel(match.team2_id, teamsById);
+    team2Span.textContent = team2Label;
     row.appendChild(team2Span);
   }
 
@@ -1116,8 +1567,26 @@ function createMatchRow(match, teamsById) {
     saveButton.className = "button button-sm";
     saveButton.textContent = "Enregistrer";
     saveButton.addEventListener("click", () => {
+      // Désactivé dès le clic : sans ça, un double-clic (ou un clic avant la fin du
+      // rechargement précédent) relance saveMatchSets avec le même match.sets périmé,
+      // qui ne voit pas encore le set tout juste créé et en RE-insère un en double au
+      // lieu de le mettre à jour. Le bouton est de toute façon remplacé à chaque
+      // loadAdminData(), donc pas besoin de le réactiver à la main après coup.
+      if (saveButton.disabled) return;
+
+      // Tous les champs vidés sur un match qui avait déjà un score : au lieu de
+      // bloquer avec "entrer un score valide", on efface le score existant.
+      const allEmpty = setInputs.every(({ input1, input2 }) => input1.value === "" && input2.value === "");
+      if (allEmpty && match.sets && match.sets.length > 0) {
+        saveButton.disabled = true;
+        clearMatchSets(match);
+        return;
+      }
+
       const enteredSets = collectEnteredSets(setInputs, match.phase);
-      if (enteredSets) saveMatchSets(match, enteredSets);
+      if (!enteredSets) return;
+      saveButton.disabled = true;
+      saveMatchSets(match, enteredSets);
     });
     actions.appendChild(saveButton);
   }
@@ -1197,6 +1666,89 @@ function renderMatchesTab(pools, teams, matches) {
     matchesList.appendChild(group);
   });
 }
+
+// --- Formule "12-quali16" : section "Qualifications" de l'onglet Matchs & Résultats ---
+
+// Numéro affiché devant chaque barrage de qualif (slot qb1..qb8 -> "Barrage 1".."Barrage 8"),
+// et texte de remplacement pour l'équipe pas encore connue d'un match du 2e tour (qb5-qb8) :
+// au lieu d'un "À déterminer" générique, on dit explicitement quel barrage il faut suivre
+// pour savoir qui on affrontera (le croisement est fixé dans generateQualifBarrages).
+const QUALIF_BARRAGE_LABELS = {
+  qb1: "Barrage 1",
+  qb2: "Barrage 2",
+  qb3: "Barrage 3",
+  qb4: "Barrage 4",
+  qb5: "Barrage 5",
+  qb6: "Barrage 6",
+  qb7: "Barrage 7",
+  qb8: "Barrage 8",
+};
+
+const QUALIF_BARRAGE_PLACEHOLDERS = {
+  qb5: { team2: "Vainqueur du Barrage 2" },
+  qb6: { team2: "Vainqueur du Barrage 1" },
+  qb7: { team2: "Vainqueur du Barrage 4" },
+  qb8: { team2: "Vainqueur du Barrage 3" },
+};
+
+const qualifSection = document.getElementById("qualif-section");
+const qualifInfo = document.getElementById("qualif-info");
+const qualifPoolsList = document.getElementById("qualif-pools-list");
+const generateQualifBarragesButton = document.getElementById("generate-qualif-barrages-button");
+const qualifBarragesList = document.getElementById("qualif-barrages-list");
+const generateMaindrawButton = document.getElementById("generate-maindraw-button");
+
+function renderQualifSection(teams, qualifMatches) {
+  const isQuali16 = currentFormat === "12-quali16";
+  qualifSection.hidden = !isQuali16;
+  if (!isQuali16) return;
+
+  const teamsById = new Map(teams.map((team) => [team.id, team]));
+  const pouleMatches = qualifMatches.filter((m) => m.phase === "qualif_poule");
+  const barrage1Matches = qualifMatches.filter((m) => m.phase === "qualif_barrage1");
+  const barrage2Matches = qualifMatches.filter((m) => m.phase === "qualif_barrage2");
+
+  qualifInfo.textContent =
+    pouleMatches.length === 0 ? "Génère d'abord les poules de qualification dans l'onglet précédent." : "";
+
+  qualifPoolsList.innerHTML = "";
+  const pouleBySlot = new Map(pouleMatches.map((m) => [m.slot, m]));
+  ["A", "B", "C", "D"].forEach((letter) => {
+    const slots = [`q${letter}-r1-1`, `q${letter}-r1-2`, `q${letter}-r2-w`, `q${letter}-r2-l`];
+    const groupMatches = slots.map((slot) => pouleBySlot.get(slot)).filter(Boolean);
+    if (groupMatches.length === 0) return;
+
+    const { group, content } = createCollapsibleGroup(`Poule Qualif ${letter}`, `qualif-${currentCategory}-${letter}`);
+    groupMatches.forEach((match) => content.appendChild(createMatchRow(match, teamsById)));
+    qualifPoolsList.appendChild(group);
+  });
+
+  const pouleMissingScore = pouleMatches.length !== 16 || pouleMatches.some((m) => !m.sets || m.sets.length === 0);
+  generateQualifBarragesButton.hidden = pouleMissingScore;
+
+  qualifBarragesList.innerHTML = "";
+  const barrageBySlot = new Map([...barrage1Matches, ...barrage2Matches].map((m) => [m.slot, m]));
+  const barrageSlots = ["qb1", "qb2", "qb3", "qb4", "qb5", "qb6", "qb7", "qb8"];
+  const allBarrages = barrageSlots.map((slot) => barrageBySlot.get(slot)).filter(Boolean);
+  if (allBarrages.length > 0) {
+    const { group, content } = createCollapsibleGroup("Barrages de qualification", `qualif-barrages-${currentCategory}`);
+    allBarrages.forEach((match) => {
+      content.appendChild(
+        createMatchRow(match, teamsById, {
+          label: QUALIF_BARRAGE_LABELS[match.slot],
+          placeholders: QUALIF_BARRAGE_PLACEHOLDERS[match.slot],
+        })
+      );
+    });
+    qualifBarragesList.appendChild(group);
+  }
+
+  const barrage2MissingScore = barrage2Matches.length !== 4 || barrage2Matches.some((m) => !m.sets || m.sets.length === 0);
+  generateMaindrawButton.hidden = barrage2MissingScore;
+}
+
+generateQualifBarragesButton.addEventListener("click", generateQualifBarrages);
+generateMaindrawButton.addEventListener("click", generateMaindrawFromQualif);
 
 const bracketInfo = document.getElementById("bracket-info");
 const generateBracketButton = document.getElementById("generate-bracket-button");
