@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qualifications — Pantin Beach Tour</title>
+  <link rel="stylesheet" href="css/style.css?v=61">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="index.html" class="logo">🏐 Pantin Beach Tour</a>
+      <nav>
+        <ul>
+          <li><a href="index.html">Poules</a></li>
+          <li><a href="phases-finales.html">Phases finales</a></li>
+          <li><a href="ordre-des-matchs.html">Ordre des matchs</a></li>
+          <li><a href="palmares.html">Palmarès</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <h1>Qualifications</h1>
+    <div class="category-toggle">
+      <button type="button" class="category-button active" data-category="Hommes">Hommes</button>
+      <button type="button" class="category-button" data-category="Femmes">Femmes</button>
+    </div>
+
+    <h2>Poules de qualification</h2>
+    <div id="qualif-pools-list"></div>
+
+    <div id="qualif-barrages-list"></div>
+
+    <h2>Les Qualifiés pour le Main Draw</h2>
+    <div id="qualified-list"></div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>Pantin Beach Tour &mdash; SSA Beach Volley Tournament</p>
+      <p class="site-footer-sub">Orga by Joss &amp; Gab</p>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabaseClient.js?v=1"></script>
+  <script src="js/nav.js?v=3"></script>
+  <script src="js/qualifs.js?v=3"></script>
+</body>
+</html>
