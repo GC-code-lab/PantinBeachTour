@@ -1,12 +1,19 @@
-// Les 2 "sections" de la page (Gestion du tournoi / Connexion) sont choisies
-// depuis le menu "⚙" du bandeau commun (voir js/nav.js), pas depuis cette page :
-// un lien classique vers gestion.html (section par défaut) ou gestion.html#compte.
-// On lit juste le hash au chargement, et on réagit s'il change sans rechargement
-// (ex: on est déjà sur gestion.html et on reclique "Connexion" dans le menu).
+// Les 3 "sections" de la page (Gestion du tournoi / Amélioration du site / Connexion)
+// sont choisies depuis le menu "⚙" du bandeau commun (voir js/nav.js), pas depuis
+// cette page : un lien classique vers gestion.html (section par défaut),
+// gestion.html#feedback ou gestion.html#compte. On lit juste le hash au chargement,
+// et on réagit s'il change sans rechargement (ex: on est déjà sur gestion.html et on
+// reclique une autre destination dans le menu).
+const GESTION_SECTIONS_BY_HASH = {
+  "#feedback": "section-feedback",
+  "#compte": "section-compte",
+};
+
 function applySectionFromHash() {
-  const showCompte = window.location.hash === "#compte";
-  document.getElementById("section-gestion").hidden = showCompte;
-  document.getElementById("section-compte").hidden = !showCompte;
+  const activeId = GESTION_SECTIONS_BY_HASH[window.location.hash] || "section-gestion";
+  ["section-gestion", "section-feedback", "section-compte"].forEach((id) => {
+    document.getElementById(id).hidden = id !== activeId;
+  });
 }
 applySectionFromHash();
 window.addEventListener("hashchange", applySectionFromHash);
@@ -85,7 +92,99 @@ function applyRoleUI(role) {
   if (isAdmin) {
     loadAccountsList();
     loadSignupCodes();
+    loadFeedbackList();
   }
+}
+
+// --- Amélioration du site : boîte à suggestions pour admins/scorers ---
+// N'importe quel admin ou scorer peut envoyer un message (table `site_feedback`,
+// policy RLS "insert" ouverte à ces deux rôles). Seuls les admins voient la liste
+// des retours reçus (policy RLS "select" réservée aux admins) — un scorer peut
+// écrire mais pas relire ce que les autres ont envoyé, comme une boîte à idées.
+const feedbackForm = document.getElementById("feedback-form");
+const feedbackMessageInput = document.getElementById("feedback-message");
+const feedbackFormMessage = document.getElementById("feedback-form-message");
+const feedbackListSection = document.getElementById("feedback-list-section");
+const feedbackList = document.getElementById("feedback-list");
+
+feedbackForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const message = feedbackMessageInput.value.trim();
+  if (!message) return;
+
+  const { error } = await supabaseClient
+    .from("site_feedback")
+    .insert({ message, author_email: currentUserEmail });
+
+  if (error) {
+    feedbackFormMessage.textContent = "Erreur : " + error.message;
+    feedbackFormMessage.style.color = "var(--color-coral)";
+    return;
+  }
+
+  feedbackForm.reset();
+  feedbackFormMessage.textContent = "Merci, c'est envoyé !";
+  feedbackFormMessage.style.color = "var(--color-ocean-dark)";
+  if (isAdminRole) loadFeedbackList();
+});
+
+function formatFeedbackDate(isoString) {
+  return new Date(isoString).toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+async function loadFeedbackList() {
+  feedbackListSection.hidden = false;
+  feedbackList.textContent = "Chargement…";
+
+  const { data, error } = await supabaseClient
+    .from("site_feedback")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    feedbackList.textContent = "Erreur de chargement : " + error.message;
+    return;
+  }
+
+  feedbackList.innerHTML = "";
+
+  if (data.length === 0) {
+    feedbackList.textContent = "Aucun retour pour l'instant.";
+    return;
+  }
+
+  data.forEach((entry) => {
+    const card = document.createElement("div");
+    card.className = "pool-card";
+
+    const message = document.createElement("p");
+    message.textContent = entry.message;
+    card.appendChild(message);
+
+    const meta = document.createElement("p");
+    meta.className = "form-message";
+    meta.textContent = `${entry.author_email} — ${formatFeedbackDate(entry.created_at)}`;
+    card.appendChild(meta);
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "button button-danger button-sm";
+    deleteButton.textContent = "Supprimer";
+    deleteButton.addEventListener("click", async () => {
+      await supabaseClient.from("site_feedback").delete().eq("id", entry.id);
+      loadFeedbackList();
+    });
+    card.appendChild(deleteButton);
+
+    feedbackList.appendChild(card);
+  });
 }
 
 // Page protégée : sans session, retour direct à l'écran de connexion.

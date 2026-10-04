@@ -38,6 +38,7 @@ supabaseClient.auth.onAuthStateChange(async (_event, session) => {
          <button type="button" class="nav-dropdown-trigger" id="nav-admin-link" aria-label="Gestion du tournoi">⚙</button>
          <div class="nav-dropdown-menu">
            <a href="gestion.html">Gestion du tournoi</a>
+           <a href="gestion.html#feedback">Amélioration du site</a>
            <a href="gestion.html#compte">Connexion</a>
          </div>
        </div>`

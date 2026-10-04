@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestion du tournoi — Pantin Beach Tour</title>
-  <link rel="stylesheet" href="css/style.css?v=61">
+  <link rel="stylesheet" href="css/style.css?v=62">
 </head>
 <body>
   <header class="site-header">
@@ -214,6 +214,23 @@
     </div>
     </div>
 
+    <div id="section-feedback" class="gestion-section" hidden>
+      <section>
+        <h2>Amélioration du site</h2>
+        <p>Une idée, un bug, un truc qui te gêne ? Écris-le ici — Gabriel le verra dans cet onglet.</p>
+        <form id="feedback-form" class="form">
+          <textarea id="feedback-message" name="feedback-message" rows="4" required placeholder="Ton message..."></textarea>
+          <button type="submit" class="button">Envoyer</button>
+        </form>
+        <p id="feedback-form-message" class="form-message"></p>
+      </section>
+
+      <section id="feedback-list-section" hidden>
+        <h2>Retours reçus</h2>
+        <div id="feedback-list"></div>
+      </section>
+    </div>
+
     <div id="section-compte" class="gestion-section" hidden>
       <section id="roles-section" hidden>
         <h2>Comptes</h2>
@@ -254,7 +271,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js?v=1"></script>
-  <script src="js/nav.js?v=3"></script>
-  <script src="js/gestion.js?v=69"></script>
+  <script src="js/nav.js?v=4"></script>
+  <script src="js/gestion.js?v=70"></script>
 </body>
 </html>
