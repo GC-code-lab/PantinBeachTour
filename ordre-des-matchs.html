@@ -23,8 +23,21 @@
 
   <main class="container courts-main">
     <h1>Ordre des matchs</h1>
-    <p id="courts-info" class="form-message"></p>
-    <div id="courts-list" class="courts-list"></div>
+
+    <div class="tabs" id="day-tabs" hidden>
+      <button type="button" class="tab-button" data-day="qualif">Qualif (Samedi)</button>
+      <button type="button" class="tab-button active" data-day="maindraw">Main-draw (Dimanche)</button>
+    </div>
+
+    <div id="day-qualif" class="day-panel" hidden>
+      <p id="qualif-courts-info" class="form-message"></p>
+      <div id="qualif-courts-list" class="courts-list"></div>
+    </div>
+
+    <div id="day-maindraw" class="day-panel">
+      <p id="courts-info" class="form-message"></p>
+      <div id="courts-list" class="courts-list"></div>
+    </div>
   </main>
 
   <footer class="site-footer">
@@ -37,6 +50,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js?v=1"></script>
   <script src="js/nav.js?v=4"></script>
-  <script src="js/ordre-des-matchs.js?v=20"></script>
+  <script src="js/ordre-des-matchs.js?v=21"></script>
 </body>
 </html>

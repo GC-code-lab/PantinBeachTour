@@ -1,5 +1,33 @@
 const courtsInfo = document.getElementById("courts-info");
 const courtsList = document.getElementById("courts-list");
+const qualifCourtsInfo = document.getElementById("qualif-courts-info");
+const qualifCourtsList = document.getElementById("qualif-courts-list");
+
+// Onglets "Qualif (Samedi)" / "Main-draw (Dimanche)" — n'existent que si la formule
+// active du tournoi comporte des qualifications (voir checkFormatAndInit tout en bas).
+// Sans qualifs, cachés : la page garde exactement son comportement d'avant (une seule
+// vue, le Main-draw).
+const dayTabs = document.getElementById("day-tabs");
+const dayButtons = document.querySelectorAll(".tab-button[data-day]");
+const dayPanels = {
+  qualif: document.getElementById("day-qualif"),
+  maindraw: document.getElementById("day-maindraw"),
+};
+
+dayButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const day = button.dataset.day;
+    dayButtons.forEach((b) => b.classList.toggle("active", b === button));
+    Object.entries(dayPanels).forEach(([key, panel]) => {
+      panel.hidden = key !== day;
+    });
+  });
+});
+
+function switchDay(day) {
+  const button = [...dayButtons].find((b) => b.dataset.day === day);
+  if (button) button.click();
+}
 
 // Les matchs de poule se jouent par TOUR : dans une poule de 4, le tour 1 (1v4 et 2v3),
 // le tour 2 (1v3 et 2v4), le tour 3 (1v2 et 3v4) — les 2 matchs d'un même tour sont
@@ -19,28 +47,39 @@ const POOL_ORDER = {
 // la demi 1), les barrages 3 et 4 alimentent qf-4 et qf-3 (donc la demi 2) — voir
 // BRACKET_PROGRESSION dans js/gestion.js. Chaque terrain suit un seul chemin complet,
 // par convention sf-1 avec la finale, sf-2 avec la petite finale.
+// `qualifBarrageSlots` suit le même découpage par chemin que les phases finales du
+// Maindraw : qb1/qb2 alimentent qb5/qb6 (même paire de poules de qualif A/B/C/D que
+// barrage-1/barrage-2 alimentent qf-1/qf-2), qb3/qb4 alimentent qb7/qb8 — voir
+// generateQualifBarrages dans js/gestion.js pour le détail des croisements.
 const COURTS = [
   {
     terrain: 1,
     category: "Hommes",
     phasesFinalesSlots: ["barrage-1", "barrage-2", "qf-1", "qf-2", "sf-1", "finale"],
+    qualifBarrageSlots: ["qb1", "qb2", "qb5", "qb6"],
   },
   {
     terrain: 2,
     category: "Femmes",
     phasesFinalesSlots: ["barrage-3", "barrage-4", "qf-3", "qf-4", "sf-2", "petite-finale"],
+    qualifBarrageSlots: ["qb3", "qb4", "qb7", "qb8"],
   },
   {
     terrain: 3,
     category: "Femmes",
     phasesFinalesSlots: ["barrage-1", "barrage-2", "qf-1", "qf-2", "sf-1", "finale"],
+    qualifBarrageSlots: ["qb1", "qb2", "qb5", "qb6"],
   },
   {
     terrain: 4,
     category: "Hommes",
     phasesFinalesSlots: ["barrage-3", "barrage-4", "qf-3", "qf-4", "sf-2", "petite-finale"],
+    qualifBarrageSlots: ["qb3", "qb4", "qb7", "qb8"],
   },
 ];
+
+// Ordre des 4 poules de qualif sur les terrains, voir buildQualifPoolRows.
+const QUALIF_POOL_LETTERS = ["A", "B", "C", "D"];
 
 const SLOT_LABELS = {
   "sf-1": "Demi 1",
@@ -53,6 +92,7 @@ function slotLabel(slot) {
   if (SLOT_LABELS[slot]) return SLOT_LABELS[slot];
   if (slot.startsWith("barrage-")) return `Barrage ${slot.split("-")[1]}`;
   if (slot.startsWith("qf-")) return `Quart ${slot.split("-")[1]}`;
+  if (slot.startsWith("qb")) return `Barrage qualif ${slot.slice(2)}`;
   return slot;
 }
 
@@ -72,6 +112,14 @@ const SLOT_PLACEHOLDERS = {
   "sf-2": ["TBD", "TBD"],
   finale: ["TBD", "TBD"],
   "petite-finale": ["TBD", "TBD"],
+  qb1: ["2e Poule A", "3e Poule C"],
+  qb2: ["2e Poule B", "3e Poule D"],
+  qb3: ["2e Poule C", "3e Poule A"],
+  qb4: ["2e Poule D", "3e Poule B"],
+  qb5: ["1er Poule A", "Vainqueur Barrage qualif 2"],
+  qb6: ["1er Poule B", "Vainqueur Barrage qualif 1"],
+  qb7: ["1er Poule C", "Vainqueur Barrage qualif 4"],
+  qb8: ["1er Poule D", "Vainqueur Barrage qualif 3"],
 };
 
 function slotTeamLabel(match, teamsById, slot, index) {
@@ -109,6 +157,64 @@ async function loadCourts() {
 
   const teamsById = new Map(teams.map((team) => [team.id, team]));
   renderCourts(pools, teamsById, poolMatches, bracketMatches);
+}
+
+// Pendant du loadCourts()/renderCourts() ci-dessus, pour la journée "Qualif" — mêmes
+// 4 terrains, mais les poules de qualif ne sont pas des lignes de la table `pools`
+// (voir buildQualifPoolRows), et les barrages de qualif suivent leurs propres créneaux
+// fixes par terrain (court.qualifBarrageSlots) plutôt que court.phasesFinalesSlots.
+async function loadQualifCourts() {
+  const { data: teams, error: teamsError } = await supabaseClient.from("teams").select("*");
+  const { data: qualifMatches, error: qualifError } = await supabaseClient
+    .from("matches")
+    .select("*, sets(*)")
+    .in("phase", ["qualif_poule", "qualif_barrage1", "qualif_barrage2"]);
+
+  if (teamsError || qualifError) {
+    qualifCourtsInfo.textContent = "Erreur de chargement des données.";
+    return;
+  }
+
+  const pouleMatches = qualifMatches.filter((m) => m.phase === "qualif_poule");
+  const barrageMatches = qualifMatches.filter((m) => m.phase !== "qualif_poule");
+
+  if (pouleMatches.length === 0) {
+    qualifCourtsInfo.textContent = "L'ordre des matchs de qualification sera affiché ici dès que les poules de qualif seront générées.";
+    qualifCourtsList.innerHTML = "";
+    return;
+  }
+
+  qualifCourtsInfo.textContent = "";
+
+  const teamsById = new Map(teams.map((team) => [team.id, team]));
+  renderQualifCourts(teamsById, pouleMatches, barrageMatches);
+}
+
+function renderQualifCourts(teamsById, pouleMatches, barrageMatches) {
+  qualifCourtsList.innerHTML = "";
+
+  COURTS.forEach((court) => {
+    const card = document.createElement("div");
+    card.className = "pool-card";
+
+    const title = document.createElement("h3");
+    title.textContent = `Terrain ${court.terrain}`;
+    card.appendChild(title);
+
+    const subtitle = document.createElement("p");
+    subtitle.className = "form-message";
+    subtitle.textContent = court.category;
+    card.appendChild(subtitle);
+
+    appendPhaseSection(card, "Poules de qualification", buildQualifPoolRows(court, pouleMatches, teamsById));
+    appendPhaseSection(
+      card,
+      "Barrages de qualification",
+      buildSlotRows(court.category, court.qualifBarrageSlots, barrageMatches, teamsById)
+    );
+
+    qualifCourtsList.appendChild(card);
+  });
 }
 
 function teamLabel(teamId, teamsById) {
@@ -234,6 +340,39 @@ function buildPoolRows(court, pools, poolMatches, teamsById) {
   return rows;
 }
 
+// Pendant de buildPoolRows ci-dessus pour les poules de qualif : mêmes "tours" de 2
+// matchs simultanés (tour 1 = 1v4/2v3, tour 2 = vainqueurs/perdants entre eux — une
+// poule brésilienne n'a que 2 tours, contre 3 pour une poule de 4 en round-robin), sauf
+// que les poules de qualif ne sont pas des lignes de la table `pools` : on regroupe
+// directement les matchs par lettre via leur `slot` (qA-r1-1, qA-r1-2, qA-r2-w, qA-r2-l).
+function buildQualifPoolRows(court, pouleMatches, teamsById) {
+  const terrains = GENDER_TERRAINS[court.category];
+  const terrainIndex = terrains.indexOf(court.terrain);
+
+  const bySlot = new Map(
+    pouleMatches.filter((match) => match.category === court.category).map((match) => [match.slot, match])
+  );
+
+  const poolRounds = QUALIF_POOL_LETTERS.map((letter) => {
+    const orderedSlots = [`q${letter}-r1-1`, `q${letter}-r1-2`, `q${letter}-r2-w`, `q${letter}-r2-l`];
+    const matches = orderedSlots.map((slot) => bySlot.get(slot)).filter(Boolean);
+    return { poolLabel: `Poule Qualif ${letter}`, rounds: chunkIntoRounds(matches) };
+  });
+
+  const maxRounds = Math.max(0, ...poolRounds.map(({ rounds }) => rounds.length));
+
+  const rows = [];
+  for (let roundIndex = 0; roundIndex < maxRounds; roundIndex++) {
+    poolRounds.forEach(({ poolLabel, rounds }) => {
+      const match = rounds[roundIndex] && rounds[roundIndex][terrainIndex];
+      if (!match) return;
+      rows.push(renderMatchRow(`${poolLabel} · Tour ${roundIndex + 1}`, match, teamsById));
+    });
+  }
+
+  return rows;
+}
+
 // Contrairement aux poules (où les équipes sont connues dès le tirage), les matchs de
 // phases finales sont toujours affichés — avec les croisements connus à l'avance
 // (SLOT_PLACEHOLDERS) tant que le vrai match n'existe pas encore côté admin.
@@ -296,4 +435,18 @@ function renderMatchRow(label, match, teamsById, slot) {
   return row;
 }
 
-loadCourts();
+// Les onglets Qualif/Main-draw n'existent que si la formule active comporte des
+// qualifications ; sinon, comportement inchangé (juste le Main-draw, pas d'onglets).
+async function checkFormatAndInit() {
+  const { data } = await supabaseClient.from("tournament_formats").select("format").maybeSingle();
+
+  if (data && data.format === "12-quali16") {
+    dayTabs.hidden = false;
+    switchDay("qualif");
+    loadQualifCourts();
+  }
+
+  loadCourts();
+}
+
+checkFormatAndInit();
