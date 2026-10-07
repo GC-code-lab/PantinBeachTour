@@ -1,4 +1,4 @@
-# Guide du site Pantin Beach Tour
+# Guide du site Sand System Tournament
 
 Ce fichier explique comment fonctionne le site, du début à la fin, en français simple — pas besoin de savoir coder pour le comprendre. L'idée : si tu rouvres ce projet dans 2 ans et que tu as tout oublié, ce fichier te remet dans le bain.
 
