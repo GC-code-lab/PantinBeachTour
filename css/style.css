@@ -613,6 +613,16 @@ section {
   color: var(--color-text-muted);
 }
 
+.match-time {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-ocean);
+  background: #e6f2fa;
+  border-radius: var(--radius-pill);
+  padding: 0.1rem 0.5rem;
+}
+
 .pool-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);

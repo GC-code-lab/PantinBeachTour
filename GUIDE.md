@@ -239,9 +239,9 @@ Si tu vas dans Supabase → Table Editor, tu verras ces tables :
 
 ## 9. L'ordre des matchs par terrain
 
-La page publique **Ordre des matchs** (`ordre-des-matchs.html`, fichier `js/ordre-des-matchs.js`) répond à une question très concrète le jour J : *"sur quel terrain et dans quel ordre je joue ?"*. Elle affiche les 4 terrains côte à côte, chacun avec sa liste de matchs dans l'ordre où ils doivent être joués (matchs de poule d'abord, puis phases finales une fois disponibles).
+La page publique **Ordre des matchs** (`ordre-des-matchs.html`, fichier `js/ordre-des-matchs.js`) répond à une question très concrète le jour J : *"sur quel terrain, à quelle heure, et dans quel ordre je joue ?"*. Elle affiche les 4 terrains côte à côte, chacun avec sa liste de matchs **avec l'horaire prévu affiché en petit** à côté de chaque match (un planning fixe, pas recalculé dynamiquement — si le tournoi prend du retard, les horaires affichés restent ceux prévus au départ).
 
-**Formule "12 équipes, qualifs 16"** : deux onglets apparaissent en haut de la page — **"Qualif (Samedi)"** et **"Main-draw (Dimanche)"** — pour séparer les deux journées. Sans cette formule, les onglets n'apparaissent pas et la page garde son comportement habituel (juste le tournoi principal). L'onglet Qualif suit la même logique terrain par terrain que le Main-draw : les 4 poules de qualification (A à D) occupent les 2 terrains de leur catégorie pour leurs 2 tours (poule brésilienne, voir section 4bis), puis les barrages de qualification suivent le même découpage par chemin que les barrages du Main-draw (Barrages de qualif 1/2 sur un terrain, 3/4 sur l'autre).
+**Formule "12 équipes, qualifs 16"** : deux onglets apparaissent en haut de la page — **"Qualif (Samedi)"** et **"Main-draw (Dimanche)"** — pour séparer les deux journées, chacune avec son propre planning (voir plus bas). Sans cette formule, les onglets n'apparaissent pas et la page garde son comportement habituel (juste le Main-draw, sans onglet).
 
 ### Répartition des terrains par catégorie
 
@@ -254,19 +254,49 @@ Il y a 4 terrains, dédiés en dur à une catégorie chacun :
 | 3 | Femmes |
 | 4 | Hommes |
 
-Chaque catégorie utilise donc 2 terrains en parallèle, indépendamment de l'autre catégorie.
+Chaque catégorie utilise donc 2 terrains en parallèle, indépendamment de l'autre catégorie — mais suit le **même planning horaire** qu'elle (définis une fois dans `MAINDRAW_SCHEDULE`/`QUALIF_SCHEDULE` de `js/ordre-des-matchs.js`, appliqués identiquement aux deux catégories sur leurs propres terrains).
 
-### Matchs de poule : un tour = 2 matchs simultanés
+### Dimanche — Main-draw (poules de 3)
 
-Dans une poule, les matchs se jouent par **tour** (une poule de 4 a 3 tours : 1v4+2v3, puis 1v3+2v4, puis 1v2+3v4 — méthode du cercle, voir aussi section 8). Les 2 matchs d'un même tour se jouent **en même temps**, chacun sur un des 2 terrains de la catégorie (le 1er terrain de la paire reçoit le 1er match du tour, le 2e terrain le 2e match). Une poule de 3 a un tour à 1 seul match — pas de simultanéité possible sur ce tour-là, il reste sur le 1er terrain.
+Avec des poules de 3 équipes, un même pool n'a jamais 2 matchs simultanés **en son sein** (il n'y a qu'1 match par tour, pas 2) : la simultanéité vient de **2 poules différentes** jouées en même temps, chacune sur un des 2 terrains de la catégorie. Planning (identique Hommes et Femmes, sur leurs terrains respectifs) :
 
-Une poule occupe donc les 2 terrains de sa catégorie pendant toute la durée de ses tours, puis c'est au tour de la poule suivante dans la file. Les poules ne s'enchaînent pas dans l'ordre alphabétique strict : l'ordre de passage (`POOL_ORDER` dans `js/ordre-des-matchs.js`) est A → B → D → C côté Hommes, A → B → C → D côté Femmes — un choix arbitraire fait pour équilibrer/varier l'enchaînement, pas une règle du format du tournoi. Si tu veux changer cet ordre un jour, c'est cette liste qu'il faut modifier.
+| Heure | Terrain 1 (1er de la paire) | Terrain 2 (2e de la paire) |
+|---|---|---|
+| 9h00 | Poule B · Tour 1 | Poule C · Tour 1 |
+| 9h30 | Poule A · Tour 1 | Poule D · Tour 1 |
+| 10h00 | Poule B · Tour 2 | Poule C · Tour 2 |
+| 10h30 | Poule A · Tour 2 | Poule D · Tour 2 |
+| 11h00 | Poule B · Tour 3 | Poule C · Tour 3 |
+| 11h30 | Poule A · Tour 3 | Poule D · Tour 3 |
+| 12h00 | Barrage 1 | Barrage 2 |
+| 12h45 | Barrage 3 | Barrage 4 |
+| 13h30 | Quart 1 (1er Poule A) | Quart 2 (1er Poule D) |
+| 14h15 | Quart 3 (1er Poule B) | Quart 4 (1er Poule C) |
+| 15h15 | Demi 1 | Demi 2 |
+| 16h15 | Finale | Petite finale |
 
-### Phases finales : chaque terrain suit "son" chemin du tableau
+Les Poules B et C tournent ensemble (chaque terrain de la catégorie alterne entre les deux), les Poules A et D tournent ensemble en décalé d'une demi-heure. Barrage 1+2 et Quart 1+2 vont ensemble (ils alimentent la Demi 1, voir section 8) ; Barrage 3+4 et Quart 3+4 vont ensemble (Demi 2). Tant qu'un match n'a pas encore d'équipes connues, la page affiche les croisements prévus par le format (ex: "2e Poule C" / "3e Poule B" pour le Barrage 1) — mêmes libellés que la page publique Phases finales.
 
-Les 4 terrains sont aussi répartis pour les phases finales, indépendamment de l'ordre des poules ci-dessus : les Barrages 1 et 2 (voir section 8) alimentent les quarts qf-1 (1er Poule A) et qf-2 (1er Poule D), qui se retrouvent ensemble en demie 1 — ce chemin complet (Barrage 1, Barrage 2, qf-1, qf-2, demie 1, finale) est sur un même terrain. Les Barrages 3 et 4 alimentent qf-3 (1er Poule B) et qf-4 (1er Poule C), qui se retrouvent en demie 2 — ce chemin (Barrage 3, Barrage 4, qf-3, qf-4, demie 2, petite finale) est sur l'autre terrain. Convention retenue : la demie 1 est associée à la finale, la demie 2 à la petite finale.
+### Samedi — Qualifications (poules de 4, "poule brésilienne")
 
-Tant qu'un match de phase finale n'a pas encore d'équipes connues, la page affiche les croisements prévus par le format (ex: "2e Poule C" / "3e Poule B" pour un barrage) — mêmes libellés que la page publique Phases finales.
+Ici, contrairement au Main-draw, une poule de qualif (4 équipes) **a bien** 2 matchs simultanés en son sein à chaque tour (1v4+2v3, puis vainqueurs entre eux/perdants entre eux — voir section 4bis) : une seule poule occupe donc les 2 terrains de la catégorie à la fois, comme pour une poule de 4 classique. Planning :
+
+| Heure | Terrain 1 (1er de la paire) | Terrain 2 (2e de la paire) |
+|---|---|---|
+| 9h00 | Poule Qualif B · Tour 1 (1v4) | Poule Qualif B · Tour 1 (2v3) |
+| 9h45 | Poule Qualif D · Tour 1 | Poule Qualif D · Tour 1 |
+| 10h30 | Poule Qualif A · Tour 1 | Poule Qualif A · Tour 1 |
+| 11h15 | Poule Qualif C · Tour 1 | Poule Qualif C · Tour 1 |
+| 12h00 | Poule Qualif B · Tour 2 | Poule Qualif B · Tour 2 |
+| 12h45 | Poule Qualif D · Tour 2 | Poule Qualif D · Tour 2 |
+| 13h30 | Poule Qualif A · Tour 2 | Poule Qualif A · Tour 2 |
+| 14h15 | Poule Qualif C · Tour 2 | Poule Qualif C · Tour 2 |
+| 15h00 | Barrage qualif 2 (2B vs 3D) | Barrage qualif 4 (2D vs 3B) |
+| 15h45 | Barrage qualif 1 (2A vs 3C) | Barrage qualif 3 (2C vs 3A) |
+| 16h30 | Barrage qualif 5 (1A vs vainqueur B2) | Barrage qualif 7 (1C vs vainqueur B4) |
+| 17h15 | Barrage qualif 6 (1B vs vainqueur B1) | Barrage qualif 8 (1D vs vainqueur B3) |
+
+Ordre de passage des poules de qualif : **B, D, A, C** (aux deux tours) — différent de l'ordre alphabétique, choix arbitraire pour varier l'enchaînement comme pour le Main-draw. Les barrages de qualif sont groupés par poules concernées : Barrage qualif 2 (2B-3D) et Barrage qualif 4 (2D-3B) ensemble à 15h (tous deux B/D) ; Barrage qualif 1 (2A-3C) et Barrage qualif 3 (2C-3A) ensemble à 15h45 (tous deux A/C) ; puis le 2e tour reprend le même regroupement (B2→B5 et B4→B7 ensemble, B1→B6 et B3→B8 ensemble) — les croisements eux-mêmes (qui affronte qui) restent ceux définis en section 4bis/8, seul le regroupement par terrain/horaire change.
 
 ---
 
@@ -331,4 +361,4 @@ git push
 
 **Correction du croisement des barrages (Maindraw)** (07/10/2026) : les barrages 1↔2 et 3↔4 étaient inversés — le vainqueur du Barrage 1 (2e Poule C) rejoignait à tort le 1er de Poule A au lieu du 1er de Poule D, et pareil pour 3↔4. Corrigé dans `BRACKET_PROGRESSION` (js/gestion.js), avec répercussion sur l'ordre d'affichage visuel du tableau (js/bracket-render.js, pour que les lignes de connexion restent justes) et sur le regroupement par terrain (js/ordre-des-matchs.js, pour que chaque terrain suive un seul chemin cohérent du tableau). Voir section 8 pour le détail exact du bon croisement.
 
-**Intégration des qualifs à "Ordre des matchs"** (07/10/2026) : la page affiche désormais 2 onglets ("Qualif (Samedi)" / "Main-draw (Dimanche)") quand la formule active comporte des qualifications — jusque-là cette page ignorait complètement les matchs de qualification. Réutilise au maximum les mécanismes déjà en place : les poules de qualif (poule brésilienne, 2 tours) suivent exactement la même logique d'alternance par tour que les poules du Main-draw (`buildQualifPoolRows`, calqué sur `buildPoolRows`, juste en regroupant les matchs par lettre de `slot` plutôt que par `pool_id` puisque ces poules n'existent pas dans la table `pools`) ; les barrages de qualif suivent le même découpage par terrain/chemin que les barrages du Main-draw (qb1/qb2 avec qb5/qb6 sur un terrain, qb3/qb4 avec qb7/qb8 sur l'autre — même principe que la correction du croisement ci-dessus).
+**Intégration des qualifs à "Ordre des matchs", avec horaires fixes** (07/10/2026) : la page affiche désormais 2 onglets ("Qualif (Samedi)" / "Main-draw (Dimanche)") quand la formule active comporte des qualifications, avec un **horaire précis affiché à côté de chaque match** sur les deux journées — jusque-là cette page ignorait les qualifs et n'affichait aucun horaire. Changement d'architecture à cette occasion : l'ancienne logique générique (`POOL_ORDER` + découpage mécanique des matchs d'une poule par paquets de 2) a été remplacée par un **planning explicite** (`MAINDRAW_SCHEDULE`/`QUALIF_SCHEDULE` dans js/ordre-des-matchs.js, un tableau d'horaires avec ce qui se joue sur chaque terrain à chaque heure), donné heure par heure par Gabriel plutôt que déduit automatiquement. Raison du changement : l'ancienne logique supposait à tort qu'un "tour" avait toujours 2 matchs simultanés *au sein d'une même poule* — vrai pour une poule de 4 (et donc pour les poules de qualif), mais **faux pour une poule de 3** (round-robin à 3 équipes, 1 seul match par tour) où elle produisait un mauvais découpage (2 matchs présentés comme simultanés alors qu'ils partagent une équipe). Le vrai planning du Main-draw (poules de 3) fait jouer 2 POULES DIFFÉRENTES en parallèle (Poule B + Poule C ensemble, Poule A + Poule D ensemble, décalées d'une demi-heure) plutôt que de chercher une simultanéité interne impossible. Voir section 9 pour le détail complet des deux plannings.

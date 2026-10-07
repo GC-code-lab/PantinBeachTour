@@ -29,57 +29,16 @@ function switchDay(day) {
   if (button) button.click();
 }
 
-// Les matchs de poule se jouent par TOUR : dans une poule de 4, le tour 1 (1v4 et 2v3),
-// le tour 2 (1v3 et 2v4), le tour 3 (1v2 et 3v4) — les 2 matchs d'un même tour sont
-// joués EN MÊME TEMPS, chacun sur un des 2 terrains de la catégorie (Hommes : 1 et 4 ;
-// Femmes : 2 et 3 — le 1er terrain de la paire reçoit le 1er match du tour, le 2e
-// terrain le 2e match). Une poule utilise donc les 2 terrains de sa catégorie pour la
-// durée de ses 3 tours, puis c'est au tour de la poule suivante dans la file — les
-// deux files (Hommes / Femmes) tournent en parallèle, indépendamment l'une de l'autre.
+// Les 4 terrains, dédiés en dur à une catégorie chacun. Hommes utilise les terrains 1
+// et 4, Femmes les terrains 2 et 3 — les deux catégories tournent en parallèle, chacune
+// sur ses 2 terrains, en suivant le MÊME planning horaire (voir *_SCHEDULE ci-dessous).
 const GENDER_TERRAINS = { Hommes: [1, 4], Femmes: [2, 3] };
-const POOL_ORDER = {
-  Hommes: ["Poule A", "Poule B", "Poule D", "Poule C"],
-  Femmes: ["Poule A", "Poule B", "Poule C", "Poule D"],
-};
-
-// Répartition des 4 terrains pour les phases finales (indépendante de l'ordre des
-// poules ci-dessus) : les barrages 1 et 2 alimentent respectivement qf-2 et qf-1 (donc
-// la demi 1), les barrages 3 et 4 alimentent qf-4 et qf-3 (donc la demi 2) — voir
-// BRACKET_PROGRESSION dans js/gestion.js. Chaque terrain suit un seul chemin complet,
-// par convention sf-1 avec la finale, sf-2 avec la petite finale.
-// `qualifBarrageSlots` suit le même découpage par chemin que les phases finales du
-// Maindraw : qb1/qb2 alimentent qb5/qb6 (même paire de poules de qualif A/B/C/D que
-// barrage-1/barrage-2 alimentent qf-1/qf-2), qb3/qb4 alimentent qb7/qb8 — voir
-// generateQualifBarrages dans js/gestion.js pour le détail des croisements.
 const COURTS = [
-  {
-    terrain: 1,
-    category: "Hommes",
-    phasesFinalesSlots: ["barrage-1", "barrage-2", "qf-1", "qf-2", "sf-1", "finale"],
-    qualifBarrageSlots: ["qb1", "qb2", "qb5", "qb6"],
-  },
-  {
-    terrain: 2,
-    category: "Femmes",
-    phasesFinalesSlots: ["barrage-3", "barrage-4", "qf-3", "qf-4", "sf-2", "petite-finale"],
-    qualifBarrageSlots: ["qb3", "qb4", "qb7", "qb8"],
-  },
-  {
-    terrain: 3,
-    category: "Femmes",
-    phasesFinalesSlots: ["barrage-1", "barrage-2", "qf-1", "qf-2", "sf-1", "finale"],
-    qualifBarrageSlots: ["qb1", "qb2", "qb5", "qb6"],
-  },
-  {
-    terrain: 4,
-    category: "Hommes",
-    phasesFinalesSlots: ["barrage-3", "barrage-4", "qf-3", "qf-4", "sf-2", "petite-finale"],
-    qualifBarrageSlots: ["qb3", "qb4", "qb7", "qb8"],
-  },
+  { terrain: 1, category: "Hommes" },
+  { terrain: 2, category: "Femmes" },
+  { terrain: 3, category: "Femmes" },
+  { terrain: 4, category: "Hommes" },
 ];
-
-// Ordre des 4 poules de qualif sur les terrains, voir buildQualifPoolRows.
-const QUALIF_POOL_LETTERS = ["A", "B", "C", "D"];
 
 const SLOT_LABELS = {
   "sf-1": "Demi 1",
@@ -98,7 +57,7 @@ function slotLabel(slot) {
 
 // Croisements connus à l'avance par le format du tournoi (indépendants des résultats),
 // affichés tant que le vrai match/l'équipe correspondante n'existe pas encore — mêmes
-// libellés que la page publique "Phases finales" (js/phases-finales.js).
+// libellés que la page publique "Phases finales".
 const SLOT_PLACEHOLDERS = {
   "barrage-1": ["2e Poule C", "3e Poule B"],
   "barrage-2": ["2e Poule B", "3e Poule C"],
@@ -127,6 +86,59 @@ function slotTeamLabel(match, teamsById, slot, index) {
   if (teamId) return teamLabel(teamId, teamsById);
   const placeholder = SLOT_PLACEHOLDERS[slot];
   return placeholder ? placeholder[index] : "À déterminer";
+}
+
+// --- Planning horaire du Main-draw (dimanche) ---
+// Avec des poules de 3, un même pool n'a jamais 2 matchs simultanés en son sein (il n'y
+// a qu'1 match par tour) : la simultanéité vient de 2 POULES DIFFÉRENTES jouées en même
+// temps, chacune sur un des 2 terrains de la catégorie. Poule B et Poule C tournent
+// ensemble (9h/10h/11h), Poule A et Poule D tournent ensemble, décalées d'une demi-heure
+// (9h30/10h30/11h30) — sur les 2 MÊMES terrains, donc chaque terrain alterne entre ses 2
+// poules. Un "poolPair" indique, pour ce terrain pair, quelle poule joue sur le 1er
+// terrain de la paire et laquelle joue sur le 2e. Ensuite, barrages/quarts/demies/
+// finales sont groupés par le chemin qu'ils alimentent (voir js/gestion.js,
+// BRACKET_PROGRESSION) : barrage-1+barrage-2 ensemble (ils alimentent qf-1/qf-2, donc
+// la demi 1), barrage-3+barrage-4 ensemble (qf-3/qf-4, demi 2).
+const MAINDRAW_SCHEDULE = [
+  { time: "9h00", kind: "poolPair", pools: ["Poule B", "Poule C"], round: 0 },
+  { time: "9h30", kind: "poolPair", pools: ["Poule A", "Poule D"], round: 0 },
+  { time: "10h00", kind: "poolPair", pools: ["Poule B", "Poule C"], round: 1 },
+  { time: "10h30", kind: "poolPair", pools: ["Poule A", "Poule D"], round: 1 },
+  { time: "11h00", kind: "poolPair", pools: ["Poule B", "Poule C"], round: 2 },
+  { time: "11h30", kind: "poolPair", pools: ["Poule A", "Poule D"], round: 2 },
+  { time: "12h00", kind: "slotPair", slots: ["barrage-1", "barrage-2"] },
+  { time: "12h45", kind: "slotPair", slots: ["barrage-3", "barrage-4"] },
+  { time: "13h30", kind: "slotPair", slots: ["qf-1", "qf-2"] },
+  { time: "14h15", kind: "slotPair", slots: ["qf-3", "qf-4"] },
+  { time: "15h15", kind: "slotPair", slots: ["sf-1", "sf-2"] },
+  { time: "16h15", kind: "slotPair", slots: ["finale", "petite-finale"] },
+];
+
+// --- Planning horaire des qualifications (samedi) ---
+// Contrairement au Main-draw, une poule de qualif (4 équipes, poule brésilienne) A bien
+// 2 matchs simultanés en son sein à chaque tour (1v4+2v3, puis vainqueurs/perdants entre
+// eux) — comme pour les poules de 4 équipes classiques. Donc ici, un "poolRound" = UNE
+// poule occupe les 2 terrains pour son tour. Ordre de passage des poules : B, D, A, C
+// (même ordre aux 2 tours). Puis les barrages de qualif sont groupés par poules
+// concernées (B+D ensemble, A+C ensemble pour le 1er tour ; les croisements du 2e tour
+// qui en découlent ensemble aussi) — voir generateQualifBarrages dans js/gestion.js.
+const QUALIF_SCHEDULE = [
+  { time: "9h00", kind: "poolRound", poolLetter: "B", round: 0 },
+  { time: "9h45", kind: "poolRound", poolLetter: "D", round: 0 },
+  { time: "10h30", kind: "poolRound", poolLetter: "A", round: 0 },
+  { time: "11h15", kind: "poolRound", poolLetter: "C", round: 0 },
+  { time: "12h00", kind: "poolRound", poolLetter: "B", round: 1 },
+  { time: "12h45", kind: "poolRound", poolLetter: "D", round: 1 },
+  { time: "13h30", kind: "poolRound", poolLetter: "A", round: 1 },
+  { time: "14h15", kind: "poolRound", poolLetter: "C", round: 1 },
+  { time: "15h00", kind: "slotPair", slots: ["qb2", "qb4"] },
+  { time: "15h45", kind: "slotPair", slots: ["qb1", "qb3"] },
+  { time: "16h30", kind: "slotPair", slots: ["qb5", "qb7"] },
+  { time: "17h15", kind: "slotPair", slots: ["qb6", "qb8"] },
+];
+
+function qualifRoundSlots(letter, round) {
+  return round === 0 ? [`q${letter}-r1-1`, `q${letter}-r1-2`] : [`q${letter}-r2-w`, `q${letter}-r2-l`];
 }
 
 async function loadCourts() {
@@ -159,10 +171,7 @@ async function loadCourts() {
   renderCourts(pools, teamsById, poolMatches, bracketMatches);
 }
 
-// Pendant du loadCourts()/renderCourts() ci-dessus, pour la journée "Qualif" — mêmes
-// 4 terrains, mais les poules de qualif ne sont pas des lignes de la table `pools`
-// (voir buildQualifPoolRows), et les barrages de qualif suivent leurs propres créneaux
-// fixes par terrain (court.qualifBarrageSlots) plutôt que court.phasesFinalesSlots.
+// Pendant du loadCourts()/renderCourts() ci-dessus, pour la journée "Qualif".
 async function loadQualifCourts() {
   const { data: teams, error: teamsError } = await supabaseClient.from("teams").select("*");
   const { data: qualifMatches, error: qualifError } = await supabaseClient
@@ -190,50 +199,11 @@ async function loadQualifCourts() {
   renderQualifCourts(teamsById, pouleMatches, barrageMatches);
 }
 
-function renderQualifCourts(teamsById, pouleMatches, barrageMatches) {
-  qualifCourtsList.innerHTML = "";
-
-  COURTS.forEach((court) => {
-    const card = document.createElement("div");
-    card.className = "pool-card";
-
-    const title = document.createElement("h3");
-    title.textContent = `Terrain ${court.terrain}`;
-    card.appendChild(title);
-
-    const subtitle = document.createElement("p");
-    subtitle.className = "form-message";
-    subtitle.textContent = court.category;
-    card.appendChild(subtitle);
-
-    appendPhaseSection(card, "Poules de qualification", buildQualifPoolRows(court, pouleMatches, teamsById));
-    appendPhaseSection(
-      card,
-      "Barrages de qualification",
-      buildSlotRows(court.category, court.qualifBarrageSlots, barrageMatches, teamsById)
-    );
-
-    qualifCourtsList.appendChild(card);
-  });
-}
-
 function teamLabel(teamId, teamsById) {
   if (!teamId) return "À déterminer";
   const team = teamsById.get(teamId);
   if (!team) return "?";
   return `${team.player1_prenom} ${team.player1_nom.charAt(0)}. / ${team.player2_prenom} ${team.player2_nom.charAt(0)}.`;
-}
-
-// Découpe les matchs d'une poule (déjà dans l'ordre de génération, donc méthode du
-// cercle : 1v4,2v3,1v3,2v4,1v2,3v4) en tours de 2 matchs simultanés — le dernier tour
-// d'une poule de 3 (round-robin à 3 matchs) n'a qu'un seul match, sans simultanéité
-// possible (il reste sur le 1er terrain de la paire).
-function chunkIntoRounds(matches) {
-  const rounds = [];
-  for (let i = 0; i < matches.length; i += 2) {
-    rounds.push(matches.slice(i, i + 2));
-  }
-  return rounds;
 }
 
 function renderCourts(pools, teamsById, poolMatches, bracketMatches) {
@@ -252,14 +222,31 @@ function renderCourts(pools, teamsById, poolMatches, bracketMatches) {
     subtitle.textContent = court.category;
     card.appendChild(subtitle);
 
-    appendPhaseSection(card, "Poules", buildPoolRows(court, pools, poolMatches, teamsById));
-    appendPhaseSection(
-      card,
-      "Phases finales",
-      buildSlotRows(court.category, court.phasesFinalesSlots, bracketMatches, teamsById)
-    );
+    appendPhaseSection(card, "Poules", buildMainDrawRows(court, pools, poolMatches, bracketMatches, teamsById));
 
     courtsList.appendChild(card);
+  });
+}
+
+function renderQualifCourts(teamsById, pouleMatches, barrageMatches) {
+  qualifCourtsList.innerHTML = "";
+
+  COURTS.forEach((court) => {
+    const card = document.createElement("div");
+    card.className = "pool-card";
+
+    const title = document.createElement("h3");
+    title.textContent = `Terrain ${court.terrain}`;
+    card.appendChild(title);
+
+    const subtitle = document.createElement("p");
+    subtitle.className = "form-message";
+    subtitle.textContent = court.category;
+    card.appendChild(subtitle);
+
+    appendPhaseSection(card, "Programme", buildQualifRows(court, pouleMatches, barrageMatches, teamsById));
+
+    qualifCourtsList.appendChild(card);
   });
 }
 
@@ -310,77 +297,65 @@ function appendPhaseSection(card, title, rows) {
   card.appendChild(section);
 }
 
-// La liste des matchs de poule d'UN terrain : les poules de la catégorie (POOL_ORDER)
-// alternent TOUR par tour — pas tous les tours de la poule A avant de passer à la
-// poule B, mais tour 1 de A, tour 1 de B, tour 1 de D, tour 1 de C, puis tour 2 de A,
-// tour 2 de B, etc. (1er terrain de la paire = 1er match du tour, 2e terrain = 2e
-// match du tour).
-function buildPoolRows(court, pools, poolMatches, teamsById) {
-  const terrains = GENDER_TERRAINS[court.category];
-  const terrainIndex = terrains.indexOf(court.terrain);
-
-  const poolRounds = POOL_ORDER[court.category].map((poolLabel) => {
-    const pool = pools.find((p) => p.category === court.category && p.label === poolLabel);
-    if (!pool) return { poolLabel, rounds: [] };
-    const matches = poolMatches.filter((match) => match.pool_id === pool.id);
-    return { poolLabel, rounds: chunkIntoRounds(matches) };
-  });
-
-  const maxRounds = Math.max(0, ...poolRounds.map(({ rounds }) => rounds.length));
-
+// Construit, pour UN terrain, la liste des lignes dans l'ordre chronologique du
+// MAINDRAW_SCHEDULE — en sautant les matchs de poule qui n'existent pas encore (poules
+// pas tirées), mais en affichant toujours les lignes de phases finales (avec les
+// croisements connus à l'avance tant que le vrai match n'existe pas).
+function buildMainDrawRows(court, pools, poolMatches, bracketMatches, teamsById) {
+  const terrainIndex = GENDER_TERRAINS[court.category].indexOf(court.terrain);
   const rows = [];
-  for (let roundIndex = 0; roundIndex < maxRounds; roundIndex++) {
-    poolRounds.forEach(({ poolLabel, rounds }) => {
-      const match = rounds[roundIndex] && rounds[roundIndex][terrainIndex];
+
+  MAINDRAW_SCHEDULE.forEach((entry) => {
+    if (entry.kind === "poolPair") {
+      const poolLabel = entry.pools[terrainIndex];
+      const pool = pools.find((p) => p.category === court.category && p.label === poolLabel);
+      if (!pool) return;
+      const matches = poolMatches
+        .filter((m) => m.pool_id === pool.id)
+        .sort((a, b) => a.id - b.id);
+      const match = matches[entry.round];
       if (!match) return;
-      rows.push(renderMatchRow(`${poolLabel} · Tour ${roundIndex + 1}`, match, teamsById));
-    });
-  }
+      rows.push(renderMatchRow(`${poolLabel} · Tour ${entry.round + 1}`, match, teamsById, null, entry.time));
+    } else if (entry.kind === "slotPair") {
+      const slot = entry.slots[terrainIndex];
+      const match = bracketMatches.find((m) => m.category === court.category && m.slot === slot);
+      rows.push(renderMatchRow(slotLabel(slot), match, teamsById, slot, entry.time));
+    }
+  });
 
   return rows;
 }
 
-// Pendant de buildPoolRows ci-dessus pour les poules de qualif : mêmes "tours" de 2
-// matchs simultanés (tour 1 = 1v4/2v3, tour 2 = vainqueurs/perdants entre eux — une
-// poule brésilienne n'a que 2 tours, contre 3 pour une poule de 4 en round-robin), sauf
-// que les poules de qualif ne sont pas des lignes de la table `pools` : on regroupe
-// directement les matchs par lettre via leur `slot` (qA-r1-1, qA-r1-2, qA-r2-w, qA-r2-l).
-function buildQualifPoolRows(court, pouleMatches, teamsById) {
-  const terrains = GENDER_TERRAINS[court.category];
-  const terrainIndex = terrains.indexOf(court.terrain);
+// Pendant de buildMainDrawRows ci-dessus pour la journée "Qualif" — voir QUALIF_SCHEDULE.
+function buildQualifRows(court, pouleMatches, barrageMatches, teamsById) {
+  const terrainIndex = GENDER_TERRAINS[court.category].indexOf(court.terrain);
 
-  const bySlot = new Map(
-    pouleMatches.filter((match) => match.category === court.category).map((match) => [match.slot, match])
+  const pouleBySlot = new Map(
+    pouleMatches.filter((m) => m.category === court.category).map((m) => [m.slot, m])
+  );
+  const barrageBySlot = new Map(
+    barrageMatches.filter((m) => m.category === court.category).map((m) => [m.slot, m])
   );
 
-  const poolRounds = QUALIF_POOL_LETTERS.map((letter) => {
-    const orderedSlots = [`q${letter}-r1-1`, `q${letter}-r1-2`, `q${letter}-r2-w`, `q${letter}-r2-l`];
-    const matches = orderedSlots.map((slot) => bySlot.get(slot)).filter(Boolean);
-    return { poolLabel: `Poule Qualif ${letter}`, rounds: chunkIntoRounds(matches) };
-  });
-
-  const maxRounds = Math.max(0, ...poolRounds.map(({ rounds }) => rounds.length));
-
   const rows = [];
-  for (let roundIndex = 0; roundIndex < maxRounds; roundIndex++) {
-    poolRounds.forEach(({ poolLabel, rounds }) => {
-      const match = rounds[roundIndex] && rounds[roundIndex][terrainIndex];
+
+  QUALIF_SCHEDULE.forEach((entry) => {
+    if (entry.kind === "poolRound") {
+      const slots = qualifRoundSlots(entry.poolLetter, entry.round);
+      const slot = slots[terrainIndex];
+      const match = pouleBySlot.get(slot);
       if (!match) return;
-      rows.push(renderMatchRow(`${poolLabel} · Tour ${roundIndex + 1}`, match, teamsById));
-    });
-  }
+      rows.push(
+        renderMatchRow(`Poule Qualif ${entry.poolLetter} · Tour ${entry.round + 1}`, match, teamsById, null, entry.time)
+      );
+    } else if (entry.kind === "slotPair") {
+      const slot = entry.slots[terrainIndex];
+      const match = barrageBySlot.get(slot);
+      rows.push(renderMatchRow(slotLabel(slot), match, teamsById, slot, entry.time));
+    }
+  });
 
   return rows;
-}
-
-// Contrairement aux poules (où les équipes sont connues dès le tirage), les matchs de
-// phases finales sont toujours affichés — avec les croisements connus à l'avance
-// (SLOT_PLACEHOLDERS) tant que le vrai match n'existe pas encore côté admin.
-function buildSlotRows(category, slots, bracketMatches, teamsById) {
-  return slots.map((slot) => {
-    const match = bracketMatches.find((m) => m.category === category && m.slot === slot);
-    return renderMatchRow(slotLabel(slot), match, teamsById, slot);
-  });
 }
 
 function createNote(text) {
@@ -398,10 +373,11 @@ function formatSetsScore(sets) {
     .join(" / ");
 }
 
-// `slot` n'est fourni que pour les matchs de phases finales : ça active l'affichage
-// des croisements connus à l'avance (SLOT_PLACEHOLDERS) quand le match n'existe pas
-// encore ou qu'une équipe n'est pas encore déterminée.
-function renderMatchRow(label, match, teamsById, slot) {
+// `slot` n'est fourni que pour les matchs dont les équipes peuvent être inconnues
+// (phases finales, barrages de qualif) : ça active l'affichage des croisements connus
+// à l'avance (SLOT_PLACEHOLDERS) quand le match n'existe pas encore côté admin. `time`
+// est optionnel, affiché en petit juste avant le nom de l'équipe 1.
+function renderMatchRow(label, match, teamsById, slot, time) {
   const row = document.createElement("div");
   row.className = match && match.status === "termine" ? "match-row match-row-done" : "match-row";
 
@@ -409,6 +385,13 @@ function renderMatchRow(label, match, teamsById, slot) {
   orderTag.className = "match-order-tag";
   orderTag.textContent = label;
   row.appendChild(orderTag);
+
+  if (time) {
+    const timeTag = document.createElement("span");
+    timeTag.className = "match-time";
+    timeTag.textContent = time;
+    row.appendChild(timeTag);
+  }
 
   const team1Span = document.createElement("span");
   team1Span.className = "match-team";
