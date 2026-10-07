@@ -11,7 +11,7 @@ const BRACKET_COL_GAP = 60;
 const BRACKET_PETITE_FINALE_GAP = 40;
 
 const BRACKET_ROUNDS = [
-  { phase: "barrage", label: "Barrages", slots: ["barrage-1", "barrage-2", "barrage-3", "barrage-4"] },
+  { phase: "barrage", label: "Barrages", slots: ["barrage-2", "barrage-1", "barrage-4", "barrage-3"] },
   { phase: "quart", label: "Quarts de finale", slots: ["qf-1", "qf-2", "qf-3", "qf-4"] },
   { phase: "demi", label: "Demi-finales", slots: ["sf-1", "sf-2"] },
   { phase: "finale", label: "Finales", slots: ["finale"] },

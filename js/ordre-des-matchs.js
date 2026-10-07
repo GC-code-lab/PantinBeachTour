@@ -15,31 +15,30 @@ const POOL_ORDER = {
 };
 
 // Répartition des 4 terrains pour les phases finales (indépendante de l'ordre des
-// poules ci-dessus) : Poule A + Poule C alimentent un même chemin du tableau, Poule B +
-// Poule D l'autre — BRACKET_PROGRESSION (voir js/gestion.js) fait rejoindre qf-1/qf-4
-// au vainqueur de Poule A/C, qf-2/qf-3 au vainqueur de Poule B/D. Il n'y a que 2 demies
-// au total (sf-1, sf-2), chacune mélangeant forcément les deux chemins : par convention,
-// une demi par terrain — sf-1 avec la finale, sf-2 avec la petite finale.
+// poules ci-dessus) : les barrages 1 et 2 alimentent respectivement qf-2 et qf-1 (donc
+// la demi 1), les barrages 3 et 4 alimentent qf-4 et qf-3 (donc la demi 2) — voir
+// BRACKET_PROGRESSION dans js/gestion.js. Chaque terrain suit un seul chemin complet,
+// par convention sf-1 avec la finale, sf-2 avec la petite finale.
 const COURTS = [
   {
     terrain: 1,
     category: "Hommes",
-    phasesFinalesSlots: ["barrage-1", "barrage-4", "qf-1", "qf-4", "sf-1", "finale"],
+    phasesFinalesSlots: ["barrage-1", "barrage-2", "qf-1", "qf-2", "sf-1", "finale"],
   },
   {
     terrain: 2,
     category: "Femmes",
-    phasesFinalesSlots: ["barrage-2", "barrage-3", "qf-2", "qf-3", "sf-2", "petite-finale"],
+    phasesFinalesSlots: ["barrage-3", "barrage-4", "qf-3", "qf-4", "sf-2", "petite-finale"],
   },
   {
     terrain: 3,
     category: "Femmes",
-    phasesFinalesSlots: ["barrage-1", "barrage-4", "qf-1", "qf-4", "sf-1", "finale"],
+    phasesFinalesSlots: ["barrage-1", "barrage-2", "qf-1", "qf-2", "sf-1", "finale"],
   },
   {
     terrain: 4,
     category: "Hommes",
-    phasesFinalesSlots: ["barrage-2", "barrage-3", "qf-2", "qf-3", "sf-2", "petite-finale"],
+    phasesFinalesSlots: ["barrage-3", "barrage-4", "qf-3", "qf-4", "sf-2", "petite-finale"],
   },
 ];
 
@@ -65,10 +64,10 @@ const SLOT_PLACEHOLDERS = {
   "barrage-2": ["2e Poule B", "3e Poule C"],
   "barrage-3": ["2e Poule D", "3e Poule A"],
   "barrage-4": ["2e Poule A", "3e Poule D"],
-  "qf-1": ["1er Poule A", "Vainqueur Barrage 1"],
-  "qf-2": ["1er Poule D", "Vainqueur Barrage 2"],
-  "qf-3": ["1er Poule B", "Vainqueur Barrage 3"],
-  "qf-4": ["1er Poule C", "Vainqueur Barrage 4"],
+  "qf-1": ["1er Poule A", "Vainqueur Barrage 2"],
+  "qf-2": ["1er Poule D", "Vainqueur Barrage 1"],
+  "qf-3": ["1er Poule B", "Vainqueur Barrage 4"],
+  "qf-4": ["1er Poule C", "Vainqueur Barrage 3"],
   "sf-1": ["TBD", "TBD"],
   "sf-2": ["TBD", "TBD"],
   finale: ["TBD", "TBD"],

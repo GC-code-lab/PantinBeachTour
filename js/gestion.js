@@ -1296,10 +1296,10 @@ function poolRoundRobin(teamIds) {
 // Barrage/quart/demi gagné -> l'équipe gagnante est placée dans le match suivant du tableau.
 // Les demies ont en plus une place "loser" : le perdant va en petite finale.
 const BRACKET_PROGRESSION = {
-  "barrage-1": { winner: { nextSlot: "qf-1", position: "team2_id" } },
-  "barrage-2": { winner: { nextSlot: "qf-2", position: "team2_id" } },
-  "barrage-3": { winner: { nextSlot: "qf-3", position: "team2_id" } },
-  "barrage-4": { winner: { nextSlot: "qf-4", position: "team2_id" } },
+  "barrage-1": { winner: { nextSlot: "qf-2", position: "team2_id" } },
+  "barrage-2": { winner: { nextSlot: "qf-1", position: "team2_id" } },
+  "barrage-3": { winner: { nextSlot: "qf-4", position: "team2_id" } },
+  "barrage-4": { winner: { nextSlot: "qf-3", position: "team2_id" } },
   "qf-1": { winner: { nextSlot: "sf-1", position: "team1_id" } },
   "qf-2": { winner: { nextSlot: "sf-1", position: "team2_id" } },
   "qf-3": { winner: { nextSlot: "sf-2", position: "team1_id" } },
