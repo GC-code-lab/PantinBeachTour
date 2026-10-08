@@ -127,6 +127,58 @@ const BRACKET_PROGRESSION = {
   qb4: { winner: { nextSlot: "qb7", position: "team2_id" } },
 };
 
+// Cherche dans BRACKET_PROGRESSION le slot dont le gagnant (ou perdant) rejoint
+// `nextSlot` à la place `position` — ex: findSourceSlot("qf-1", "team2_id") renvoie
+// "barrage-2". Utilisé pour savoir quel match précis décide de l'adversaire d'un match
+// pas encore joué, et donc pouvoir y créer un lien.
+function findSourceSlot(nextSlot, position) {
+  for (const [slot, progression] of Object.entries(BRACKET_PROGRESSION)) {
+    if (progression.winner && progression.winner.nextSlot === nextSlot && progression.winner.position === position) {
+      return slot;
+    }
+    if (progression.loser && progression.loser.nextSlot === nextSlot && progression.loser.position === position) {
+      return slot;
+    }
+  }
+  return null;
+}
+
+// Qualif ou Main-draw ? Détermine vers quel onglet de "Ordre des matchs" un slot pointe.
+function slotDay(slot) {
+  if (!slot) return "maindraw";
+  if (slot.startsWith("qb") || /^q[A-D]-r/.test(slot)) return "qualif";
+  return "maindraw";
+}
+
+function matchLink(day, anchor) {
+  return `ordre-des-matchs.html?day=${day}&anchor=${encodeURIComponent(anchor)}`;
+}
+
+// Décrit l'adversaire d'un match (existant ou pas encore créé), dans cet ordre :
+// équipe déjà connue en base > match précis qui la déterminera (lien cliquable) >
+// placeholder fixe (ex: "1er Poule A", pas de match à lier) > texte générique.
+// `position` = le champ (team1_id/team2_id) qu'occupe l'équipe suivie.
+function resolveOpponent(slot, position, matchRecord, teamsById) {
+  const otherPosition = position === "team1_id" ? "team2_id" : "team1_id";
+  const otherTeamId = matchRecord ? matchRecord[otherPosition] : null;
+
+  if (otherTeamId) {
+    return { text: teamShortName(teamsById.get(otherTeamId)), linkSlot: null };
+  }
+
+  const sourceSlot = slot ? findSourceSlot(slot, otherPosition) : null;
+  if (sourceSlot) {
+    return { text: `vainqueur de ${slotLabel(sourceSlot)}`, linkSlot: sourceSlot };
+  }
+
+  const placeholder = slot ? SLOT_PLACEHOLDERS[slot] : null;
+  if (placeholder) {
+    return { text: placeholder[otherPosition === "team1_id" ? 0 : 1], linkSlot: null };
+  }
+
+  return { text: "pas encore connu", linkSlot: null };
+}
+
 // --- Recherche ---
 
 function normalize(str) {
@@ -247,7 +299,7 @@ async function loadTeamTimeline(team) {
       if (entry.kind !== "poolPair" || entry.round !== roundIndex) continue;
       const idx = entry.pools.indexOf(pool.label);
       if (idx === -1) continue;
-      return { time: entry.time, terrain: GENDER_TERRAINS[team.category][idx], label: pool.label };
+      return { time: entry.time, day: "maindraw", terrain: GENDER_TERRAINS[team.category][idx], label: pool.label };
     }
     return null;
   }
@@ -256,19 +308,23 @@ async function loadTeamTimeline(team) {
     for (const entry of MAINDRAW_SCHEDULE) {
       if (entry.kind === "slotPair") {
         const idx = entry.slots.indexOf(slot);
-        if (idx !== -1) return { time: entry.time, terrain: GENDER_TERRAINS[team.category][idx], label: slotLabel(slot) };
+        if (idx !== -1) {
+          return { time: entry.time, day: "maindraw", terrain: GENDER_TERRAINS[team.category][idx], label: slotLabel(slot) };
+        }
       }
     }
     for (const entry of QUALIF_SCHEDULE) {
       if (entry.kind === "slotPair") {
         const idx = entry.slots.indexOf(slot);
-        if (idx !== -1) return { time: entry.time, terrain: GENDER_TERRAINS[team.category][idx], label: slotLabel(slot) };
+        if (idx !== -1) {
+          return { time: entry.time, day: "qualif", terrain: GENDER_TERRAINS[team.category][idx], label: slotLabel(slot) };
+        }
       }
       if (entry.kind === "poolRound") {
         const slots = qualifRoundSlots(entry.poolLetter, entry.round);
         const idx = slots.indexOf(slot);
         if (idx !== -1) {
-          return { time: entry.time, terrain: GENDER_TERRAINS[team.category][idx], label: slotLabel(slot) };
+          return { time: entry.time, day: "qualif", terrain: GENDER_TERRAINS[team.category][idx], label: slotLabel(slot) };
         }
       }
     }
@@ -286,7 +342,10 @@ async function loadTeamTimeline(team) {
     .map((m) => ({ match: m, schedule: resolveSchedule(m) }))
     .filter((row) => row.schedule);
 
-  confirmed.sort((a, b) => timeToMinutes(a.schedule.time) - timeToMinutes(b.schedule.time));
+  // Samedi (qualif) toujours avant dimanche (Main-draw), peu importe l'heure brute —
+  // sans ça, un match de qualif à 9h se retrouverait trié après un match de Main-draw
+  // à 9h30 du lendemain.
+  confirmed.sort((a, b) => scheduleSortKey(a.schedule) - scheduleSortKey(b.schedule));
 
   renderTimeline(team, teamsById, matchesBySlot, confirmed);
 }
@@ -294,6 +353,13 @@ async function loadTeamTimeline(team) {
 function timeToMinutes(timeStr) {
   const [h, m] = timeStr.split("h");
   return Number(h) * 60 + Number(m || 0);
+}
+
+// Clé de tri chronologique sur les 2 jours : samedi (qualif) avant dimanche (Main-draw),
+// quelle que soit l'heure brute de chacun.
+function scheduleSortKey(schedule) {
+  const dayOffset = schedule.day === "qualif" ? 0 : 1;
+  return dayOffset * 10000 + timeToMinutes(schedule.time);
 }
 
 function requiredWins(phase) {
@@ -357,16 +423,6 @@ function renderTimeline(team, teamsById, matchesBySlot, confirmed) {
   }
 }
 
-function opponentLabel(team, teamsById, match) {
-  const opponentId = match.team1_id === team.id ? match.team2_id : match.team1_id;
-  if (opponentId) return teamShortName(teamsById.get(opponentId));
-  if (match.slot && SLOT_PLACEHOLDERS[match.slot]) {
-    const isTeam1 = match.team1_id === team.id;
-    return SLOT_PLACEHOLDERS[match.slot][isTeam1 ? 1 : 0];
-  }
-  return "À déterminer";
-}
-
 function renderMatchCard(team, teamsById, match, schedule) {
   const card = document.createElement("div");
   card.className = match.status === "termine" ? "match-row match-row-done" : "match-row";
@@ -376,14 +432,19 @@ function renderMatchCard(team, teamsById, match, schedule) {
   timeTag.textContent = schedule.time;
   card.appendChild(timeTag);
 
-  const terrainTag = document.createElement("span");
-  terrainTag.className = "match-order-tag";
+  const terrainTag = document.createElement("a");
+  terrainTag.className = "match-order-tag match-order-link";
+  terrainTag.href = matchLink(slotDay(match.slot), match.slot ? `slot:${match.slot}` : `match:${match.id}`);
   terrainTag.textContent = `${schedule.label} · Terrain ${schedule.terrain}`;
   card.appendChild(terrainTag);
 
-  const opponent = document.createElement("span");
-  opponent.className = "match-team team2";
-  opponent.textContent = `vs ${opponentLabel(team, teamsById, match)}`;
+  const position = match.team1_id === team.id ? "team1_id" : "team2_id";
+  const { text: opponentText, linkSlot } = resolveOpponent(match.slot, position, match, teamsById);
+
+  const opponent = document.createElement(linkSlot ? "a" : "span");
+  opponent.className = linkSlot ? "match-team team2 hint-match-link" : "match-team team2";
+  if (linkSlot) opponent.href = matchLink(slotDay(linkSlot), `slot:${linkSlot}`);
+  opponent.textContent = `vs ${opponentText}`;
   card.appendChild(opponent);
 
   if (match.sets && match.sets.length > 0) {
@@ -421,39 +482,23 @@ function resolveSlotSchedule(slot, category) {
   return null;
 }
 
-// Texte générique pour l'adversaire d'un match pas encore créé et sans placeholder fixe
-// (cas des créneaux internes aux poules de qualif, "qX-r2-w"/"qX-r2-l" : contrairement
-// aux barrages, leurs 2 participants dépendent du tour 1 de CETTE poule, pas d'un
-// classement de poule fixe — pas de "2e Poule X" possible ici).
-function genericOpponentText(slot) {
-  if (slot.endsWith("-r2-w")) return "le vainqueur de l'autre match du tour 1";
-  if (slot.endsWith("-r2-l")) return "le perdant de l'autre match du tour 1";
-  return "pas encore connu";
-}
-
 // `position` = le champ (team1_id/team2_id) que l'équipe suivie occupera dans le match
 // suivant — déterministe dès que BRACKET_PROGRESSION le dit, même avant que le match
-// précédent soit joué. Le champ opposé donne l'adversaire, résolu dans cet ordre :
-// équipe déjà connue en base > placeholder fixe (ex: "1er Poule A") > texte générique.
+// précédent soit joué.
 function describeNextStep(nextSlot, position, category, teamsById, matchesBySlot) {
   const schedule = resolveSlotSchedule(nextSlot, category);
   const existingMatch = matchesBySlot.get(nextSlot);
-  const otherPosition = position === "team1_id" ? "team2_id" : "team1_id";
-  const otherTeamId = existingMatch ? existingMatch[otherPosition] : null;
-
-  let opponentText;
-  if (otherTeamId) {
-    opponentText = teamShortName(teamsById.get(otherTeamId));
-  } else {
-    const placeholder = SLOT_PLACEHOLDERS[nextSlot];
-    opponentText = placeholder ? placeholder[otherPosition === "team1_id" ? 0 : 1] : genericOpponentText(nextSlot);
-  }
+  const { text: opponentText, linkSlot } = resolveOpponent(nextSlot, position, existingMatch, teamsById);
 
   return {
     label: slotLabel(nextSlot),
+    slot: nextSlot,
+    day: slotDay(nextSlot),
     time: schedule ? schedule.time : null,
     terrain: schedule ? schedule.terrain : null,
     opponentText,
+    opponentSlot: linkSlot,
+    opponentDay: linkSlot ? slotDay(linkSlot) : null,
   };
 }
 
@@ -492,8 +537,24 @@ function renderHintLine(prefix, info) {
   strong.textContent = `${prefix} : `;
   line.appendChild(strong);
 
-  const timeText = info.time ? `${info.time} (terrain ${info.terrain})` : "?";
-  line.appendChild(document.createTextNode(`${info.label} — ${timeText} — contre ${info.opponentText}`));
+  const matchLinkEl = document.createElement("a");
+  matchLinkEl.className = "hint-match-link";
+  matchLinkEl.href = matchLink(info.day, `slot:${info.slot}`);
+  matchLinkEl.textContent = info.label;
+  line.appendChild(matchLinkEl);
+
+  const timeText = info.time ? ` — ${info.time} (terrain ${info.terrain})` : " — ?";
+  line.appendChild(document.createTextNode(`${timeText} — contre `));
+
+  if (info.opponentSlot) {
+    const oppLink = document.createElement("a");
+    oppLink.className = "hint-match-link";
+    oppLink.href = matchLink(info.opponentDay, `slot:${info.opponentSlot}`);
+    oppLink.textContent = info.opponentText;
+    line.appendChild(oppLink);
+  } else {
+    line.appendChild(document.createTextNode(info.opponentText));
+  }
 
   return line;
 }

@@ -1188,3 +1188,34 @@ section {
   margin: 0.3rem 0;
   font-size: 0.9rem;
 }
+
+.hint-match-link,
+a.match-order-tag {
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.hint-match-link {
+  color: var(--color-ocean);
+  font-weight: 700;
+}
+
+.hint-match-link:hover,
+a.match-order-tag:hover {
+  text-decoration: underline;
+}
+
+.match-row-highlight {
+  animation: match-row-flash 2.5s ease-out;
+}
+
+@keyframes match-row-flash {
+  0%, 40% {
+    box-shadow: 0 0 0 3px var(--color-ocean);
+    background: #e6f2fa;
+  }
+  100% {
+    box-shadow: none;
+    background: var(--color-surface);
+  }
+}

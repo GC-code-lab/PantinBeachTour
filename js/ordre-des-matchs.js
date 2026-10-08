@@ -381,6 +381,13 @@ function renderMatchRow(label, match, teamsById, slot, time) {
   const row = document.createElement("div");
   row.className = match && match.status === "termine" ? "match-row match-row-done" : "match-row";
 
+  // Ancre utilisée par le lien "voir ce match" depuis la page Suivi d'équipe : les
+  // matchs à slot fixe (phases finales, barrages de qualif) sont identifiés par leur
+  // slot (existe même si le match n'a pas encore été créé côté admin) ; les matchs de
+  // poule (pas de slot) sont identifiés par leur id, qui lui existe forcément puisqu'un
+  // match de poule n'est affiché ici qu'une fois réellement généré.
+  row.dataset.anchor = slot ? `slot:${slot}` : match ? `match:${match.id}` : "";
+
   const orderTag = document.createElement("span");
   orderTag.className = "match-order-tag";
   orderTag.textContent = label;
@@ -418,18 +425,53 @@ function renderMatchRow(label, match, teamsById, slot, time) {
   return row;
 }
 
+// Arrivée depuis un lien "voir ce match" de la page Suivi d'équipe
+// (ordre-des-matchs.html?day=qualif&anchor=slot:qb5) : bascule sur le bon onglet,
+// déplie la section repliable qui contient la ligne visée, scrolle jusqu'à elle et la
+// met en surbrillance un instant.
+function handleDeepLink() {
+  const params = new URLSearchParams(window.location.search);
+  const anchor = params.get("anchor");
+  if (!anchor) return;
+
+  requestAnimationFrame(() => {
+    const target = document.querySelector(`[data-anchor="${CSS.escape(anchor)}"]`);
+    if (!target) return;
+
+    const content = target.closest(".pool-card-content");
+    if (content && content.hidden) {
+      content.hidden = false;
+      const header = content.previousElementSibling;
+      if (header && header.classList.contains("pool-card-header")) {
+        header.setAttribute("aria-expanded", "true");
+      }
+    }
+
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    target.classList.add("match-row-highlight");
+    setTimeout(() => target.classList.remove("match-row-highlight"), 2500);
+  });
+}
+
 // Les onglets Qualif/Main-draw n'existent que si la formule active comporte des
 // qualifications ; sinon, comportement inchangé (juste le Main-draw, pas d'onglets).
 async function checkFormatAndInit() {
   const { data } = await supabaseClient.from("tournament_formats").select("format").maybeSingle();
+  const hasQualifs = data && data.format === "12-quali16";
 
-  if (data && data.format === "12-quali16") {
+  if (hasQualifs) {
     dayTabs.hidden = false;
-    switchDay("qualif");
-    loadQualifCourts();
+    await loadQualifCourts();
   }
 
-  loadCourts();
+  await loadCourts();
+
+  if (hasQualifs) {
+    const requestedDay = new URLSearchParams(window.location.search).get("day");
+    switchDay(requestedDay === "maindraw" ? "maindraw" : "qualif");
+  }
+
+  handleDeepLink();
 }
 
 checkFormatAndInit();
