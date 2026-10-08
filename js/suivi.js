@@ -406,6 +406,18 @@ function matchAnchor(category, slot, matchId) {
   return slot ? `slot:${category}:${slot}` : `match:${matchId}`;
 }
 
+// "win"/"loss" une fois le match tranché (assez de sets gagnés pour sa phase), sinon
+// null (match en cours ou pas encore joué — pas de verdict à afficher).
+function matchOutcomeForTeam(match, teamId) {
+  const sets = (match && match.sets) || [];
+  const needed = match.phase === "poule" ? 1 : 2;
+  const wins1 = sets.filter((s) => s.score_team1 > s.score_team2).length;
+  const wins2 = sets.filter((s) => s.score_team2 > s.score_team1).length;
+  if (wins1 < needed && wins2 < needed) return null;
+  const winnerId = wins1 >= needed ? match.team1_id : match.team2_id;
+  return winnerId === teamId ? "win" : "loss";
+}
+
 function renderMatchCard(team, teamsById, match, schedule) {
   const card = document.createElement("div");
   card.className = match.status === "termine" ? "match-row match-row-done" : "match-row";
@@ -435,6 +447,14 @@ function renderMatchCard(team, teamsById, match, schedule) {
     score.className = "match-score";
     score.textContent = formatSetsScore(match.sets);
     card.appendChild(score);
+
+    const outcome = matchOutcomeForTeam(match, team.id);
+    if (outcome) {
+      const resultBadge = document.createElement("span");
+      resultBadge.className = outcome === "win" ? "badge badge-win" : "badge badge-loss";
+      resultBadge.textContent = outcome === "win" ? "Gagné" : "Perdu";
+      card.appendChild(resultBadge);
+    }
   } else {
     const badge = document.createElement("span");
     badge.className = "badge";

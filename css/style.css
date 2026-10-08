@@ -526,6 +526,18 @@ section {
   text-align: center;
 }
 
+.badge-win {
+  background: #eafaf0;
+  color: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.badge-loss {
+  background: #fbeceb;
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
 .match-score-form {
   display: flex;
   align-items: center;
