@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sand System Tournament</title>
+  <title>Suivi d'équipe — Sand System Tournament</title>
   <link rel="stylesheet" href="css/style.css?v=64">
 </head>
 <body>
@@ -12,10 +12,10 @@
       <a href="index.html" class="logo">🏐 Sand System Tournament</a>
       <nav>
         <ul>
-          <li><a href="index.html" class="active">Poules</a></li>
+          <li><a href="index.html">Poules</a></li>
           <li><a href="phases-finales.html">Phases finales</a></li>
           <li><a href="ordre-des-matchs.html">Ordre des matchs</a></li>
-          <li><a href="suivi.html">Suivi d'équipe</a></li>
+          <li><a href="suivi.html" class="active">Suivi d'équipe</a></li>
           <li><a href="palmares.html">Palmarès</a></li>
         </ul>
       </nav>
@@ -23,12 +23,15 @@
   </header>
 
   <main class="container">
-    <h1>Poules</h1>
-    <div class="category-toggle">
-      <button type="button" class="category-button active" data-category="Hommes">Hommes</button>
-      <button type="button" class="category-button" data-category="Femmes">Femmes</button>
+    <h1>Suivi d'équipe</h1>
+    <p class="form-message">Cherche une paire par le prénom ou le nom d'un des deux joueurs, pour suivre tous ses matchs : terrain, horaire, adversaire, score.</p>
+
+    <div class="search-wrap">
+      <input type="text" id="team-search" placeholder="Ex : Dupont, Jean..." autocomplete="off">
+      <div id="search-results" class="search-results" hidden></div>
     </div>
-    <div id="pools-list"></div>
+
+    <div id="tracking-section" hidden></div>
   </main>
 
   <footer class="site-footer">
@@ -40,6 +43,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js?v=1"></script>
   <script src="js/nav.js?v=4"></script>
-  <script src="js/poules.js?v=6"></script>
+  <script src="js/suivi.js?v=4"></script>
 </body>
 </html>
