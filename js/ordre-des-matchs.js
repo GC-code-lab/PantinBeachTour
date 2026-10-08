@@ -29,15 +29,15 @@ function switchDay(day) {
   if (button) button.click();
 }
 
-// Les 4 terrains, dédiés en dur à une catégorie chacun. Hommes utilise les terrains 1
-// et 4, Femmes les terrains 2 et 3 — les deux catégories tournent en parallèle, chacune
+// Les 4 terrains, dédiés en dur à une catégorie chacun. Hommes utilise les terrains 2
+// et 3, Femmes les terrains 1 et 4 — les deux catégories tournent en parallèle, chacune
 // sur ses 2 terrains, en suivant le MÊME planning horaire (voir *_SCHEDULE ci-dessous).
-const GENDER_TERRAINS = { Hommes: [1, 4], Femmes: [2, 3] };
+const GENDER_TERRAINS = { Hommes: [2, 3], Femmes: [1, 4] };
 const COURTS = [
-  { terrain: 1, category: "Hommes" },
-  { terrain: 2, category: "Femmes" },
-  { terrain: 3, category: "Femmes" },
-  { terrain: 4, category: "Hommes" },
+  { terrain: 1, category: "Femmes" },
+  { terrain: 2, category: "Hommes" },
+  { terrain: 3, category: "Hommes" },
+  { terrain: 4, category: "Femmes" },
 ];
 
 const SLOT_LABELS = {

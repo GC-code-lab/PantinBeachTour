@@ -249,10 +249,10 @@ Il y a 4 terrains, dédiés en dur à une catégorie chacun :
 
 | Terrain | Catégorie |
 |---|---|
-| 1 | Hommes |
-| 2 | Femmes |
-| 3 | Femmes |
-| 4 | Hommes |
+| 1 | Femmes |
+| 2 | Hommes |
+| 3 | Hommes |
+| 4 | Femmes |
 
 Chaque catégorie utilise donc 2 terrains en parallèle, indépendamment de l'autre catégorie — mais suit le **même planning horaire** qu'elle (définis une fois dans `MAINDRAW_SCHEDULE`/`QUALIF_SCHEDULE` de `js/ordre-des-matchs.js`, appliqués identiquement aux deux catégories sur leurs propres terrains).
 
@@ -362,3 +362,5 @@ git push
 **Correction du croisement des barrages (Maindraw)** (07/10/2026) : les barrages 1↔2 et 3↔4 étaient inversés — le vainqueur du Barrage 1 (2e Poule C) rejoignait à tort le 1er de Poule A au lieu du 1er de Poule D, et pareil pour 3↔4. Corrigé dans `BRACKET_PROGRESSION` (js/gestion.js), avec répercussion sur l'ordre d'affichage visuel du tableau (js/bracket-render.js, pour que les lignes de connexion restent justes) et sur le regroupement par terrain (js/ordre-des-matchs.js, pour que chaque terrain suive un seul chemin cohérent du tableau). Voir section 8 pour le détail exact du bon croisement.
 
 **Intégration des qualifs à "Ordre des matchs", avec horaires fixes** (07/10/2026) : la page affiche désormais 2 onglets ("Qualif (Samedi)" / "Main-draw (Dimanche)") quand la formule active comporte des qualifications, avec un **horaire précis affiché à côté de chaque match** sur les deux journées — jusque-là cette page ignorait les qualifs et n'affichait aucun horaire. Changement d'architecture à cette occasion : l'ancienne logique générique (`POOL_ORDER` + découpage mécanique des matchs d'une poule par paquets de 2) a été remplacée par un **planning explicite** (`MAINDRAW_SCHEDULE`/`QUALIF_SCHEDULE` dans js/ordre-des-matchs.js, un tableau d'horaires avec ce qui se joue sur chaque terrain à chaque heure), donné heure par heure par Gabriel plutôt que déduit automatiquement. Raison du changement : l'ancienne logique supposait à tort qu'un "tour" avait toujours 2 matchs simultanés *au sein d'une même poule* — vrai pour une poule de 4 (et donc pour les poules de qualif), mais **faux pour une poule de 3** (round-robin à 3 équipes, 1 seul match par tour) où elle produisait un mauvais découpage (2 matchs présentés comme simultanés alors qu'ils partagent une équipe). Le vrai planning du Main-draw (poules de 3) fait jouer 2 POULES DIFFÉRENTES en parallèle (Poule B + Poule C ensemble, Poule A + Poule D ensemble, décalées d'une demi-heure) plutôt que de chercher une simultanéité interne impossible. Voir section 9 pour le détail complet des deux plannings.
+
+**Inversion des terrains par catégorie** (08/10/2026) : Hommes et Femmes ont échangé leurs terrains — Hommes joue maintenant sur 2 et 3, Femmes sur 1 et 4 (c'était l'inverse). Un seul endroit à changer : `GENDER_TERRAINS`/`COURTS` dans js/ordre-des-matchs.js, le reste du site ne fait jamais référence à un numéro de terrain précis.
