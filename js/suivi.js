@@ -1,8 +1,9 @@
 // Page publique "Suivi d'équipe" : cherche une paire par nom de joueur, affiche tous
 // ses matchs (connus en base) triés chronologiquement avec horaire + terrain (déduits
 // des mêmes plannings que js/ordre-des-matchs.js — dupliqués ici volontairement, ce
-// site n'a pas de module JS partagé entre pages), et un pronostic "si elle gagne/perd"
-// sur la suite quand le prochain tour n'existe pas encore en base.
+// site n'a pas de module JS partagé entre pages). Chaque match a un lien vers sa ligne
+// dans "Ordre des matchs" ; quand l'adversaire n'est pas encore connu mais déductible
+// (ex: "vainqueur du Barrage 2"), ce texte est lui aussi cliquable.
 
 const searchInput = document.getElementById("team-search");
 const searchResults = document.getElementById("search-results");
@@ -277,7 +278,6 @@ async function loadTeamTimeline(team) {
   }
 
   const teamsById = new Map(teams.map((t) => [t.id, t]));
-  const matchesBySlot = new Map(matches.filter((m) => m.slot).map((m) => [m.slot, m]));
 
   const poolMatchesByPoolId = new Map();
   matches
@@ -347,7 +347,7 @@ async function loadTeamTimeline(team) {
   // à 9h30 du lendemain.
   confirmed.sort((a, b) => scheduleSortKey(a.schedule) - scheduleSortKey(b.schedule));
 
-  renderTimeline(team, teamsById, matchesBySlot, confirmed);
+  renderTimeline(team, teamsById, confirmed);
 }
 
 function timeToMinutes(timeStr) {
@@ -362,20 +362,6 @@ function scheduleSortKey(schedule) {
   return dayOffset * 10000 + timeToMinutes(schedule.time);
 }
 
-function requiredWins(phase) {
-  return phase === "poule" ? 1 : 2;
-}
-
-function matchResult(match) {
-  const sets = (match && match.sets) || [];
-  const wins1 = sets.filter((s) => s.score_team1 > s.score_team2).length;
-  const wins2 = sets.filter((s) => s.score_team2 > s.score_team1).length;
-  const needed = requiredWins(match.phase);
-  if (wins1 >= needed) return { winnerId: match.team1_id, loserId: match.team2_id };
-  if (wins2 >= needed) return { winnerId: match.team2_id, loserId: match.team1_id };
-  return null;
-}
-
 function formatSetsScore(sets) {
   return sets
     .slice()
@@ -386,7 +372,7 @@ function formatSetsScore(sets) {
 
 // --- Rendu ---
 
-function renderTimeline(team, teamsById, matchesBySlot, confirmed) {
+function renderTimeline(team, teamsById, confirmed) {
   trackingSection.innerHTML = "";
 
   const header = document.createElement("div");
@@ -411,16 +397,13 @@ function renderTimeline(team, teamsById, matchesBySlot, confirmed) {
   confirmed.forEach(({ match, schedule }) => {
     trackingSection.appendChild(renderMatchCard(team, teamsById, match, schedule));
   });
+}
 
-  // Pronostic "si elle gagne/perd" sur le dernier match connu, s'il est en attente et
-  // qu'il mène quelque part (phase à élimination).
-  const last = confirmed[confirmed.length - 1].match;
-  const progression = BRACKET_PROGRESSION[last.slot];
-  const result = matchResult(last);
-
-  if (progression && !result) {
-    trackingSection.appendChild(renderHintBox(team, teamsById, matchesBySlot, progression));
-  }
+// L'ancre d'un match dans "Ordre des matchs" doit inclure la catégorie : un `slot`
+// comme "barrage-2" n'est pas unique en base (il existe une fois par catégorie), donc
+// sans ça le lien tombe sur le premier des deux trouvé dans la page (souvent Femmes).
+function matchAnchor(category, slot, matchId) {
+  return slot ? `slot:${category}:${slot}` : `match:${matchId}`;
 }
 
 function renderMatchCard(team, teamsById, match, schedule) {
@@ -434,7 +417,7 @@ function renderMatchCard(team, teamsById, match, schedule) {
 
   const terrainTag = document.createElement("a");
   terrainTag.className = "match-order-tag match-order-link";
-  terrainTag.href = matchLink(slotDay(match.slot), match.slot ? `slot:${match.slot}` : `match:${match.id}`);
+  terrainTag.href = matchLink(slotDay(match.slot), matchAnchor(team.category, match.slot, match.id));
   terrainTag.textContent = `${schedule.label} · Terrain ${schedule.terrain}`;
   card.appendChild(terrainTag);
 
@@ -443,7 +426,7 @@ function renderMatchCard(team, teamsById, match, schedule) {
 
   const opponent = document.createElement(linkSlot ? "a" : "span");
   opponent.className = linkSlot ? "match-team team2 hint-match-link" : "match-team team2";
-  if (linkSlot) opponent.href = matchLink(slotDay(linkSlot), `slot:${linkSlot}`);
+  if (linkSlot) opponent.href = matchLink(slotDay(linkSlot), matchAnchor(team.category, linkSlot, null));
   opponent.textContent = `vs ${opponentText}`;
   card.appendChild(opponent);
 
@@ -460,103 +443,6 @@ function renderMatchCard(team, teamsById, match, schedule) {
   }
 
   return card;
-}
-
-// Horaire + terrain d'un slot donné, qu'il vienne du planning du Main-draw ou de celui
-// des qualifs (barrages ET créneaux internes aux poules de qualif, ex: "qC-r2-w").
-function resolveSlotSchedule(slot, category) {
-  for (const entry of MAINDRAW_SCHEDULE) {
-    if (entry.kind !== "slotPair") continue;
-    const idx = entry.slots.indexOf(slot);
-    if (idx !== -1) return { time: entry.time, terrain: GENDER_TERRAINS[category][idx] };
-  }
-  for (const entry of QUALIF_SCHEDULE) {
-    if (entry.kind === "slotPair") {
-      const idx = entry.slots.indexOf(slot);
-      if (idx !== -1) return { time: entry.time, terrain: GENDER_TERRAINS[category][idx] };
-    } else if (entry.kind === "poolRound") {
-      const idx = qualifRoundSlots(entry.poolLetter, entry.round).indexOf(slot);
-      if (idx !== -1) return { time: entry.time, terrain: GENDER_TERRAINS[category][idx] };
-    }
-  }
-  return null;
-}
-
-// `position` = le champ (team1_id/team2_id) que l'équipe suivie occupera dans le match
-// suivant — déterministe dès que BRACKET_PROGRESSION le dit, même avant que le match
-// précédent soit joué.
-function describeNextStep(nextSlot, position, category, teamsById, matchesBySlot) {
-  const schedule = resolveSlotSchedule(nextSlot, category);
-  const existingMatch = matchesBySlot.get(nextSlot);
-  const { text: opponentText, linkSlot } = resolveOpponent(nextSlot, position, existingMatch, teamsById);
-
-  return {
-    label: slotLabel(nextSlot),
-    slot: nextSlot,
-    day: slotDay(nextSlot),
-    time: schedule ? schedule.time : null,
-    terrain: schedule ? schedule.terrain : null,
-    opponentText,
-    opponentSlot: linkSlot,
-    opponentDay: linkSlot ? slotDay(linkSlot) : null,
-  };
-}
-
-function renderHintBox(team, teamsById, matchesBySlot, progression) {
-  const box = document.createElement("div");
-  box.className = "hint-box";
-
-  const title = document.createElement("h3");
-  title.textContent = "Et ensuite ?";
-  box.appendChild(title);
-
-  if (progression.winner) {
-    box.appendChild(
-      renderHintLine(
-        "Si elle gagne",
-        describeNextStep(progression.winner.nextSlot, progression.winner.position, team.category, teamsById, matchesBySlot)
-      )
-    );
-  }
-  if (progression.loser) {
-    box.appendChild(
-      renderHintLine(
-        "Si elle perd",
-        describeNextStep(progression.loser.nextSlot, progression.loser.position, team.category, teamsById, matchesBySlot)
-      )
-    );
-  }
-
-  return box;
-}
-
-function renderHintLine(prefix, info) {
-  const line = document.createElement("p");
-
-  const strong = document.createElement("strong");
-  strong.textContent = `${prefix} : `;
-  line.appendChild(strong);
-
-  const matchLinkEl = document.createElement("a");
-  matchLinkEl.className = "hint-match-link";
-  matchLinkEl.href = matchLink(info.day, `slot:${info.slot}`);
-  matchLinkEl.textContent = info.label;
-  line.appendChild(matchLinkEl);
-
-  const timeText = info.time ? ` — ${info.time} (terrain ${info.terrain})` : " — ?";
-  line.appendChild(document.createTextNode(`${timeText} — contre `));
-
-  if (info.opponentSlot) {
-    const oppLink = document.createElement("a");
-    oppLink.className = "hint-match-link";
-    oppLink.href = matchLink(info.opponentDay, `slot:${info.opponentSlot}`);
-    oppLink.textContent = info.opponentText;
-    line.appendChild(oppLink);
-  } else {
-    line.appendChild(document.createTextNode(info.opponentText));
-  }
-
-  return line;
 }
 
 async function init() {

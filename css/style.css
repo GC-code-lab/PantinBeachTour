@@ -1169,26 +1169,6 @@ section {
   margin-bottom: 0.2rem;
 }
 
-.hint-box {
-  margin-top: 1.25rem;
-  background: #e6f2fa;
-  border: 1px solid var(--color-ocean);
-  border-radius: var(--radius);
-  padding: 1rem 1.25rem;
-}
-
-.hint-box h3 {
-  margin-top: 0;
-  margin-bottom: 0.5rem;
-  font-size: 1rem;
-  color: var(--color-ocean-dark);
-}
-
-.hint-box p {
-  margin: 0.3rem 0;
-  font-size: 0.9rem;
-}
-
 .hint-match-link,
 a.match-order-tag {
   text-decoration: none;

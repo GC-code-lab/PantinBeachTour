@@ -315,11 +315,11 @@ function buildMainDrawRows(court, pools, poolMatches, bracketMatches, teamsById)
         .sort((a, b) => a.id - b.id);
       const match = matches[entry.round];
       if (!match) return;
-      rows.push(renderMatchRow(`${poolLabel} · Tour ${entry.round + 1}`, match, teamsById, null, entry.time));
+      rows.push(renderMatchRow(`${poolLabel} · Tour ${entry.round + 1}`, match, teamsById, null, entry.time, court.category));
     } else if (entry.kind === "slotPair") {
       const slot = entry.slots[terrainIndex];
       const match = bracketMatches.find((m) => m.category === court.category && m.slot === slot);
-      rows.push(renderMatchRow(slotLabel(slot), match, teamsById, slot, entry.time));
+      rows.push(renderMatchRow(slotLabel(slot), match, teamsById, slot, entry.time, court.category));
     }
   });
 
@@ -346,12 +346,19 @@ function buildQualifRows(court, pouleMatches, barrageMatches, teamsById) {
       const match = pouleBySlot.get(slot);
       if (!match) return;
       rows.push(
-        renderMatchRow(`Poule Qualif ${entry.poolLetter} · Tour ${entry.round + 1}`, match, teamsById, null, entry.time)
+        renderMatchRow(
+          `Poule Qualif ${entry.poolLetter} · Tour ${entry.round + 1}`,
+          match,
+          teamsById,
+          null,
+          entry.time,
+          court.category
+        )
       );
     } else if (entry.kind === "slotPair") {
       const slot = entry.slots[terrainIndex];
       const match = barrageBySlot.get(slot);
-      rows.push(renderMatchRow(slotLabel(slot), match, teamsById, slot, entry.time));
+      rows.push(renderMatchRow(slotLabel(slot), match, teamsById, slot, entry.time, court.category));
     }
   });
 
@@ -376,17 +383,18 @@ function formatSetsScore(sets) {
 // `slot` n'est fourni que pour les matchs dont les équipes peuvent être inconnues
 // (phases finales, barrages de qualif) : ça active l'affichage des croisements connus
 // à l'avance (SLOT_PLACEHOLDERS) quand le match n'existe pas encore côté admin. `time`
-// est optionnel, affiché en petit juste avant le nom de l'équipe 1.
-function renderMatchRow(label, match, teamsById, slot, time) {
+// est optionnel, affiché en petit juste avant le nom de l'équipe 1. `category` sert
+// uniquement à construire une ancre unique (voir plus bas).
+function renderMatchRow(label, match, teamsById, slot, time, category) {
   const row = document.createElement("div");
   row.className = match && match.status === "termine" ? "match-row match-row-done" : "match-row";
 
   // Ancre utilisée par le lien "voir ce match" depuis la page Suivi d'équipe : les
   // matchs à slot fixe (phases finales, barrages de qualif) sont identifiés par leur
-  // slot (existe même si le match n'a pas encore été créé côté admin) ; les matchs de
-  // poule (pas de slot) sont identifiés par leur id, qui lui existe forcément puisqu'un
-  // match de poule n'est affiché ici qu'une fois réellement généré.
-  row.dataset.anchor = slot ? `slot:${slot}` : match ? `match:${match.id}` : "";
+  // slot + catégorie — un `slot` comme "barrage-2" existe une fois par catégorie, donc
+  // sans la catégorie le lien tombait au hasard sur Hommes ou Femmes. Les matchs de
+  // poule (pas de slot) sont identifiés par leur id, qui lui est déjà unique tout court.
+  row.dataset.anchor = slot ? `slot:${category}:${slot}` : match ? `match:${match.id}` : "";
 
   const orderTag = document.createElement("span");
   orderTag.className = "match-order-tag";
