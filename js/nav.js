@@ -1,7 +1,7 @@
 const navList = document.querySelector(".site-header nav ul");
 
-// Lien public "Qualifs", ajouté tout en premier (avant "Poules") — visible par
-// tout le monde (pas besoin d'être connecté), uniquement quand la formule active
+// Lien public "Qualifs", ajouté juste après "Équipes" (donc avant "Poules") — visible
+// par tout le monde (pas besoin d'être connecté), uniquement quand la formule active
 // du tournoi comporte des qualifications. Indépendant de l'état de connexion,
 // donc hors du bloc onAuthStateChange ci-dessous.
 (async () => {
@@ -11,7 +11,9 @@ const navList = document.querySelector(".site-header nav ul");
   const isCurrentPage = window.location.pathname.endsWith("qualifs.html");
   const item = document.createElement("li");
   item.innerHTML = `<a href="qualifs.html"${isCurrentPage ? ' class="active"' : ""}>Qualifs</a>`;
-  navList.insertBefore(item, navList.firstChild);
+  // "Équipes" est toujours le tout premier lien (voir chaque fichier HTML) : Qualifs
+  // doit arriver juste après, pas avant.
+  navList.insertBefore(item, navList.children[1] || null);
 })();
 
 supabaseClient.auth.onAuthStateChange(async (_event, session) => {
