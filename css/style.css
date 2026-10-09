@@ -59,6 +59,18 @@ body {
   justify-content: center;
 }
 
+/* Même besoin que .bracket-main (voir commentaire ci-dessus), mais sans centrer
+   le h1/le sélecteur Hommes-Femmes : utilisé sur la page Main Draw, qui combine
+   les onglets "Poule" et "Phases Finales" sous un même titre partagé — recentrer
+   ce titre uniquement quand l'onglet Phases Finales est actif serait un va-et-vient
+   visuel gênant au changement d'onglet. Ajoutée/retirée dynamiquement sur <main>
+   par js/maindraw-tabs.js selon l'onglet actif. */
+.bracket-wide {
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+}
+
 .courts-main {
   max-width: 1400px;
 }

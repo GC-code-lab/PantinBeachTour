@@ -1,12 +1,16 @@
 const bracketContainer = document.getElementById("bracket");
 
-const categoryButtons = document.querySelectorAll(".category-button");
-let currentCategory = "Hommes";
+// Noms dédiés (pas "categoryButtons"/"currentCategory") car ce fichier est chargé
+// sur la même page que js/poules.js (onglets "Poule" / "Phases Finales" du Main
+// Draw) : deux `const`/`let` de même nom au niveau racine, dans deux <script>
+// classiques sur la même page, provoqueraient une erreur de double déclaration.
+const bracketCategoryButtons = document.querySelectorAll(".category-button");
+let currentBracketCategory = "Hommes";
 
-categoryButtons.forEach((button) => {
+bracketCategoryButtons.forEach((button) => {
   button.addEventListener("click", () => {
-    currentCategory = button.dataset.category;
-    categoryButtons.forEach((b) => b.classList.toggle("active", b.dataset.category === currentCategory));
+    currentBracketCategory = button.dataset.category;
+    bracketCategoryButtons.forEach((b) => b.classList.toggle("active", b.dataset.category === currentBracketCategory));
     loadBracket();
   });
 });
@@ -15,12 +19,12 @@ async function loadBracket() {
   const { data: teams, error: teamsError } = await supabaseClient
     .from("teams")
     .select("*")
-    .eq("category", currentCategory);
+    .eq("category", currentBracketCategory);
 
   const { data: matches, error: matchesError } = await supabaseClient
     .from("matches")
     .select("*, sets(*)")
-    .eq("category", currentCategory)
+    .eq("category", currentBracketCategory)
     .in("phase", ["barrage", "quart", "demi", "petite_finale", "finale"]);
 
   if (teamsError || matchesError) {

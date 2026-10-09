@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sand System Tournament</title>
-  <link rel="stylesheet" href="css/style.css?v=68">
+  <link rel="stylesheet" href="css/style.css?v=69">
 </head>
 <body>
   <header class="site-header">
@@ -13,8 +13,7 @@
       <nav>
         <ul>
           <li><a href="equipes.html">Équipes</a></li>
-          <li><a href="index.html" class="active">Poules</a></li>
-          <li><a href="phases-finales.html">Phases finales</a></li>
+          <li><a href="index.html" class="active">Main Draw</a></li>
           <li><a href="ordre-des-matchs.html">Ordre des matchs</a></li>
           <li><a href="suivi.html">Suivi d'équipe</a></li>
           <li><a href="palmares.html">Palmarès</a></li>
@@ -24,12 +23,24 @@
   </header>
 
   <main class="container">
-    <h1>Poules</h1>
+    <h1>Main Draw</h1>
     <div class="category-toggle">
       <button type="button" class="category-button active" data-category="Hommes">Hommes</button>
       <button type="button" class="category-button" data-category="Femmes">Femmes</button>
     </div>
-    <div id="pools-list"></div>
+
+    <div class="tabs">
+      <button type="button" class="tab-button active" data-subtab="poule">Poule</button>
+      <button type="button" class="tab-button" data-subtab="phases-finales">Phases Finales</button>
+    </div>
+
+    <div id="subtab-poule" class="tab-panel">
+      <div id="pools-list"></div>
+    </div>
+
+    <div id="subtab-phases-finales" class="tab-panel" hidden>
+      <div id="bracket"></div>
+    </div>
   </main>
 
   <footer class="site-footer">
@@ -42,5 +53,8 @@
   <script src="js/supabaseClient.js?v=1"></script>
   <script src="js/nav.js?v=5"></script>
   <script src="js/poules.js?v=7"></script>
+  <script src="js/bracket-render.js?v=2"></script>
+  <script src="js/phases-finales.js?v=5"></script>
+  <script src="js/maindraw-tabs.js?v=1"></script>
 </body>
 </html>
