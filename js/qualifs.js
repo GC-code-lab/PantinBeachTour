@@ -34,20 +34,9 @@ subTabButtons.forEach((button) => {
   });
 });
 
-// Numéro affiché devant chaque barrage, et croisement connu à l'avance par le format
-// (toujours affiché, même avant que les poules de qualif soient jouées) — même
-// convention que côté admin (js/gestion.js) et "Ordre des matchs".
-const QUALIF_BARRAGE_LABELS = {
-  qb1: "Barrage 1",
-  qb2: "Barrage 2",
-  qb3: "Barrage 3",
-  qb4: "Barrage 4",
-  qb5: "Barrage 5",
-  qb6: "Barrage 6",
-  qb7: "Barrage 7",
-  qb8: "Barrage 8",
-};
-
+// Croisement connu à l'avance par le format (toujours affiché, même avant que les
+// poules de qualif soient jouées) — même convention que côté admin (js/gestion.js)
+// et "Ordre des matchs".
 const QUALIF_BARRAGE_PLACEHOLDERS = {
   qb1: ["2e Poule A", "3e Poule C"],
   qb2: ["2e Poule B", "3e Poule D"],
@@ -244,6 +233,74 @@ function renderPoules(teamsById, pouleMatches) {
   });
 }
 
+// Tableau visuel des barrages de qualif, même esprit que le tableau des phases
+// finales (js/bracket-render.js) : boîtes reliées par des lignes. Contrairement au
+// tableau du Maindraw, ce n'est pas un arbre qui converge (8 -> 4 -> 2 -> 1) mais
+// 2 tours en parallèle de 4 matchs chacun, reliés 1 pour 1 (qb1->qb6, qb2->qb5,
+// qb3->qb8, qb4->qb7) : l'ordre d'affichage du 2e tour est donc réarrangé en
+// [qb6, qb5, qb8, qb7] pour aligner chaque croisement sur la même ligne et éviter
+// que les lignes de connexion se croisent visuellement.
+// Dimensions identiques à js/bracket-render.js (dupliquées ici : cette page ne
+// charge pas ce fichier, et la structure du tableau est trop différente pour
+// réutiliser renderBracket tel quel — voir plus bas).
+const QB_BOX_WIDTH = 220;
+const QB_BOX_HEIGHT = 67;
+const QB_ITEM_GAP = 20;
+const QB_COL_GAP = 60;
+
+const QUALIF_BARRAGE_ROUNDS = [
+  { label: "Barrages (1er tour)", slots: ["qb1", "qb2", "qb3", "qb4"] },
+  { label: "Barrages (2e tour)", slots: ["qb6", "qb5", "qb8", "qb7"] },
+];
+
+function createBarrageMatchBox(match, teamsById, x, y, slot) {
+  const box = document.createElement("div");
+  box.className = "bracket-match";
+  box.style.left = `${x}px`;
+  box.style.top = `${y}px`;
+  box.style.width = `${QB_BOX_WIDTH}px`;
+
+  const placeholders = QUALIF_BARRAGE_PLACEHOLDERS[slot] || [];
+  const team1 = match ? teamsById.get(match.team1_id) : null;
+  const team2 = match ? teamsById.get(match.team2_id) : null;
+
+  const team1Div = document.createElement("div");
+  team1Div.className = "bracket-team";
+  team1Div.textContent = team1 ? matchTeamLabel(team1) : placeholders[0] || "À déterminer";
+  box.appendChild(team1Div);
+
+  const team2Div = document.createElement("div");
+  team2Div.className = "bracket-team";
+  team2Div.textContent = team2 ? matchTeamLabel(team2) : placeholders[1] || "À déterminer";
+  box.appendChild(team2Div);
+
+  const sets = (match && match.sets) || [];
+  const scoreLine = document.createElement("div");
+  if (sets.length > 0) {
+    scoreLine.className = "bracket-score";
+    scoreLine.textContent = formatSetsScore(sets);
+  } else {
+    scoreLine.className = "badge bracket-score";
+    scoreLine.textContent = "?";
+  }
+  box.appendChild(scoreLine);
+
+  return box;
+}
+
+// Trace une ligne droite (segment SVG) entre deux points — identique à bracketSvgLine
+// de js/bracket-render.js, dupliqué ici pour ne pas dépendre de ce fichier (structure
+// trop différente pour réutiliser renderBracket tel quel).
+function barrageSvgLine(x1, y1, x2, y2) {
+  const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+  line.setAttribute("x1", x1);
+  line.setAttribute("y1", y1);
+  line.setAttribute("x2", x2);
+  line.setAttribute("y2", y2);
+  line.setAttribute("class", "bracket-connector");
+  return line;
+}
+
 // Les 8 croisements sont toujours affichés, même avant que les poules de qualif
 // soient jouées — avec les placeholders fixes (ex: "2e Poule A") tant que l'équipe
 // réelle n'est pas encore connue, pour que les joueurs voient le chemin complet.
@@ -251,23 +308,56 @@ function renderBarrages(teamsById, barrage1Matches, barrage2Matches) {
   barragesList.innerHTML = "";
 
   const bySlot = new Map([...barrage1Matches, ...barrage2Matches].map((m) => [m.slot, m]));
-  const slots = ["qb1", "qb2", "qb3", "qb4", "qb5", "qb6", "qb7", "qb8"];
+  const centerY = (k) => k * (QB_BOX_HEIGHT + QB_ITEM_GAP) + QB_BOX_HEIGHT / 2;
+  const totalWidth = QUALIF_BARRAGE_ROUNDS.length * QB_BOX_WIDTH + (QUALIF_BARRAGE_ROUNDS.length - 1) * QB_COL_GAP;
+  const totalHeight = 4 * QB_BOX_HEIGHT + 3 * QB_ITEM_GAP;
 
-  const card = document.createElement("div");
-  card.className = "pool-card";
+  const scroller = document.createElement("div");
+  scroller.className = "bracket-scroller";
 
-  const barragesSection = createCollapsibleSection("Barrages de qualification");
-  slots.forEach((slot) => {
-    barragesSection.content.appendChild(
-      renderMatchRow(bySlot.get(slot), teamsById, {
-        label: QUALIF_BARRAGE_LABELS[slot],
-        placeholders: QUALIF_BARRAGE_PLACEHOLDERS[slot],
-      })
-    );
+  const titles = document.createElement("div");
+  titles.className = "bracket-titles";
+  titles.style.width = `${totalWidth}px`;
+  QUALIF_BARRAGE_ROUNDS.forEach((round, i) => {
+    const title = document.createElement("span");
+    title.style.left = `${i * (QB_BOX_WIDTH + QB_COL_GAP)}px`;
+    title.style.width = `${QB_BOX_WIDTH}px`;
+    title.textContent = round.label;
+    titles.appendChild(title);
   });
-  card.appendChild(barragesSection.section);
+  scroller.appendChild(titles);
 
-  barragesList.appendChild(card);
+  const tree = document.createElement("div");
+  tree.className = "bracket-tree";
+  tree.style.width = `${totalWidth}px`;
+  tree.style.height = `${totalHeight}px`;
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("width", totalWidth);
+  svg.setAttribute("height", totalHeight);
+  svg.classList.add("bracket-connectors");
+
+  QUALIF_BARRAGE_ROUNDS.forEach((round, i) => {
+    const x = i * (QB_BOX_WIDTH + QB_COL_GAP);
+
+    round.slots.forEach((slot, k) => {
+      const y = centerY(k) - QB_BOX_HEIGHT / 2;
+      tree.appendChild(createBarrageMatchBox(bySlot.get(slot), teamsById, x, y, slot));
+    });
+
+    if (i === QUALIF_BARRAGE_ROUNDS.length - 1) return;
+
+    const boxRight = x + QB_BOX_WIDTH;
+    const nextBoxLeft = boxRight + QB_COL_GAP;
+    round.slots.forEach((slot, k) => {
+      const y = centerY(k);
+      svg.appendChild(barrageSvgLine(boxRight, y, nextBoxLeft, y));
+    });
+  });
+
+  tree.appendChild(svg);
+  scroller.appendChild(tree);
+  barragesList.appendChild(scroller);
 }
 
 // Dès qu'un barrage du 2e tour (qb5-qb8) est tranché, son vainqueur rejoint cette
