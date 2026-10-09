@@ -6,8 +6,6 @@ Site web du tournoi de beach volley. Côté public : poules (équipes, matchs, r
 
 Depuis ce dossier :
 
-test_push_master
-
 ```
 python3 -m http.server 8000
 ```
