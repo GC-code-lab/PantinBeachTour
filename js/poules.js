@@ -22,7 +22,8 @@ async function loadPools() {
     .from("teams")
     .select("*")
     .eq("category", currentCategory)
-    .order("seed", { ascending: true, nullsFirst: false });
+    .order("seed", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true });
 
   const { data: matches, error: matchesError } = await supabaseClient
     .from("matches")
@@ -37,11 +38,111 @@ async function loadPools() {
   }
 
   if (pools.length === 0) {
+    const { data: formatData } = await supabaseClient.from("tournament_formats").select("format").maybeSingle();
+    const isQuali16 = Boolean(formatData && formatData.format === "12-quali16");
+    if (isQuali16 && teams.length >= 24) {
+      renderMaindrawPreview(teams);
+      return;
+    }
     poolsList.textContent = "Les poules seront affichées ici dès que le tirage sera fait.";
     return;
   }
 
   renderPools(pools, teams, matches);
+}
+
+// Pour la formule "12-quali16" : aperçu des poules du Maindraw avant même que les
+// qualifications aient commencé. Les 8 équipes "direct Maindraw" dont les points
+// dépassent la meilleure équipe de qualif sont certaines de leur rang final (aucun
+// qualifié ne pourra jamais les dépasser au classement) et peuvent donc déjà être
+// placées dans leur poule — les autres slots (qualifiés à venir, et équipes direct
+// "wild card" dont le rang dépend du résultat des qualifs) restent "TBD".
+function poolIndexForRank(rank) {
+  const round = Math.floor((rank - 1) / 4);
+  const posInRound = (rank - 1) % 4;
+  const order = round % 2 === 0 ? [0, 1, 2, 3] : [3, 2, 1, 0];
+  return order[posInRound];
+}
+
+function renderMaindrawPreview(teams) {
+  poolsList.innerHTML = "";
+
+  const ordered = defaultSeedOrder(teams);
+  const directTeams = ordered.slice(0, 8);
+  const qualifTeams = ordered.slice(8, 24);
+  const maxQualifPoints = Math.max(...qualifTeams.map(teamPoints));
+
+  const sortedDirect = directTeams.slice().sort((a, b) => {
+    const diff = teamPoints(b) - teamPoints(a);
+    if (diff !== 0) return diff;
+    return new Date(a.created_at) - new Date(b.created_at);
+  });
+
+  const confirmed = [];
+  const uncertain = [];
+  sortedDirect.forEach((team) => {
+    if (teamPoints(team) > maxQualifPoints) confirmed.push(team);
+    else uncertain.push(team);
+  });
+
+  // #pools-list est lui-même une grille à 2 colonnes (CSS) : ce wrapper doit donc
+  // occuper les 2 colonnes, sinon il se retrouve confiné à une seule cellule
+  // (la moitié gauche de la page) au lieu de prendre toute la largeur.
+  const wrapper = document.createElement("div");
+  wrapper.style.gridColumn = "1 / -1";
+
+  const note = document.createElement("p");
+  note.className = "form-message";
+  note.textContent =
+    "Aperçu du Maindraw avant la fin des qualifications : les poules ci-dessous ne sont pas encore définitives.";
+  wrapper.appendChild(note);
+
+  const poolLabels = ["Poule A", "Poule B", "Poule C", "Poule D"];
+  const slotsByPool = Array.from({ length: 4 }, () => []);
+
+  confirmed.forEach((team, index) => {
+    slotsByPool[poolIndexForRank(index + 1)].push(formatTeamDetail(team));
+  });
+  for (let rank = confirmed.length + 1; rank <= 12; rank++) {
+    slotsByPool[poolIndexForRank(rank)].push("TBD");
+  }
+
+  // Grille à part (pas directement enfant de #pools-list, qui est lui-même en
+  // grille 2 colonnes) pour garder exactement 4 cartes symétriques, même quand
+  // il y a des équipes incertaines à lister en dessous.
+  const grid = document.createElement("div");
+  grid.className = "pool-grid";
+
+  poolLabels.forEach((label, i) => {
+    const card = document.createElement("div");
+    card.className = "pool-card";
+
+    const title = document.createElement("h3");
+    title.textContent = label;
+    card.appendChild(title);
+
+    const list = document.createElement("ul");
+    slotsByPool[i].forEach((text) => {
+      const item = document.createElement("li");
+      item.textContent = text;
+      list.appendChild(item);
+    });
+    card.appendChild(list);
+
+    grid.appendChild(card);
+  });
+  wrapper.appendChild(grid);
+
+  if (uncertain.length > 0) {
+    const uncertainNote = document.createElement("p");
+    uncertainNote.className = "maindraw-preview-uncertain";
+    uncertainNote.textContent =
+      "En attente de confirmation de poule (en fonction du résultat des qualifications) : " +
+      uncertain.map((team) => formatTeamDetail(team)).join(", ");
+    wrapper.appendChild(uncertainNote);
+  }
+
+  poolsList.appendChild(wrapper);
 }
 
 function formatTeamDetail(team) {

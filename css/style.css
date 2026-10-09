@@ -598,7 +598,8 @@ section {
 /* Admin */
 
 #pools-list,
-.courts-list {
+.courts-list,
+.pool-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
@@ -610,9 +611,17 @@ section {
   margin-top: 1.25rem;
 }
 
+.maindraw-preview-uncertain {
+  margin-top: 1.5rem;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--color-text-muted);
+}
+
 @media (max-width: 600px) {
   #pools-list,
-  .courts-list {
+  .courts-list,
+  .pool-grid {
     grid-template-columns: 1fr;
   }
 }

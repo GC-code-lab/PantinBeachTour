@@ -138,6 +138,8 @@ Cette formule ajoute une phase de qualification avant le tournoi principal (le "
 
 Les scores des qualifications se saisissent uniquement depuis l'admin (par un admin ou un scorer, comme les autres scores). Ils sont consultables publiquement sur la page **Qualifs** (voir section 3), qui n'apparaît dans le bandeau que si cette formule est active.
 
+**Aperçu des poules du Maindraw avant même le début des qualifications** : la page publique "Poules" (section 3) affiche un aperçu dès que 24 équipes sont inscrites, sans attendre que les qualifications soient jouées ni même générées. Les équipes "direct Maindraw" dont les points dépassent la meilleure équipe de qualif sont certaines de leur rang final (aucune qualifiée ne pourra jamais les dépasser au classement final) et apparaissent donc déjà dans leur poule A/B/C/D. Les 4 slots qualifiés affichent "TBD". Une équipe "direct Maindraw" placée par wild card (points inférieurs ou égaux à une équipe de qualif) a un rang final incertain — elle n'est pas placée dans une poule, mais listée à part ("En attente de confirmation de poule") jusqu'à la fin des qualifications.
+
 ---
 
 ## 5. Sauvegarde du tournoi (Palmarès)
