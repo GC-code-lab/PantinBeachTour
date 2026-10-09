@@ -17,8 +17,26 @@ categoryButtons.forEach((button) => {
   });
 });
 
-// Numéro affiché devant chaque barrage, et texte de remplacement pour l'équipe pas
-// encore connue d'un match du 2e tour — même croisement que côté admin (js/gestion.js).
+// Sous-onglets "Poules" / "Barrages" de cette page.
+const subTabButtons = document.querySelectorAll(".tab-button[data-subtab]");
+const subTabPanels = {
+  poules: document.getElementById("subtab-poules"),
+  barrages: document.getElementById("subtab-barrages"),
+};
+
+subTabButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const tab = button.dataset.subtab;
+    subTabButtons.forEach((b) => b.classList.toggle("active", b === button));
+    Object.entries(subTabPanels).forEach(([key, panel]) => {
+      panel.hidden = key !== tab;
+    });
+  });
+});
+
+// Numéro affiché devant chaque barrage, et croisement connu à l'avance par le format
+// (toujours affiché, même avant que les poules de qualif soient jouées) — même
+// convention que côté admin (js/gestion.js) et "Ordre des matchs".
 const QUALIF_BARRAGE_LABELS = {
   qb1: "Barrage 1",
   qb2: "Barrage 2",
@@ -31,10 +49,14 @@ const QUALIF_BARRAGE_LABELS = {
 };
 
 const QUALIF_BARRAGE_PLACEHOLDERS = {
-  qb5: "Vainqueur du Barrage 2",
-  qb6: "Vainqueur du Barrage 1",
-  qb7: "Vainqueur du Barrage 4",
-  qb8: "Vainqueur du Barrage 3",
+  qb1: ["2e Poule A", "3e Poule C"],
+  qb2: ["2e Poule B", "3e Poule D"],
+  qb3: ["2e Poule C", "3e Poule A"],
+  qb4: ["2e Poule D", "3e Poule B"],
+  qb5: ["1er Poule A", "Vainqueur du Barrage 2"],
+  qb6: ["1er Poule B", "Vainqueur du Barrage 1"],
+  qb7: ["1er Poule C", "Vainqueur du Barrage 4"],
+  qb8: ["1er Poule D", "Vainqueur du Barrage 3"],
 };
 
 function matchTeamLabel(team) {
@@ -87,10 +109,13 @@ function createCollapsibleSection(title) {
   return { header, content, section };
 }
 
-function renderMatchRow(match, teamsById, { label, team2Placeholder } = {}) {
-  const team1 = teamsById.get(match.team1_id);
-  const team2 = teamsById.get(match.team2_id);
-  const sets = match.sets || [];
+// `match` peut être absent (pas encore créé côté admin) — dans ce cas, `placeholders`
+// (un tableau [texte équipe 1, texte équipe 2]) prend le relais pour afficher le
+// croisement connu à l'avance par le format, plutôt qu'un "À déterminer" générique.
+function renderMatchRow(match, teamsById, { label, placeholders } = {}) {
+  const team1 = match ? teamsById.get(match.team1_id) : null;
+  const team2 = match ? teamsById.get(match.team2_id) : null;
+  const sets = (match && match.sets) || [];
 
   const row = document.createElement("div");
   row.className = "match-row";
@@ -104,7 +129,7 @@ function renderMatchRow(match, teamsById, { label, team2Placeholder } = {}) {
 
   const team1Span = document.createElement("span");
   team1Span.className = "match-team";
-  team1Span.textContent = team1 ? matchTeamLabel(team1) : "À déterminer";
+  team1Span.textContent = team1 ? matchTeamLabel(team1) : (placeholders && placeholders[0]) || "À déterminer";
   row.appendChild(team1Span);
 
   if (sets.length > 0) {
@@ -121,7 +146,7 @@ function renderMatchRow(match, teamsById, { label, team2Placeholder } = {}) {
 
   const team2Span = document.createElement("span");
   team2Span.className = "match-team team2";
-  team2Span.textContent = team2 ? matchTeamLabel(team2) : team2Placeholder || "À déterminer";
+  team2Span.textContent = team2 ? matchTeamLabel(team2) : (placeholders && placeholders[1]) || "À déterminer";
   row.appendChild(team2Span);
 
   return row;
@@ -184,8 +209,10 @@ function renderPoules(teamsById, pouleMatches) {
     title.textContent = `Poule Qualif ${letter}`;
     card.appendChild(title);
 
+    // Ordre tête de série (1,2,3,4) dans la poule — r1a oppose 1 et 4 (team1/team2),
+    // r1b oppose 2 et 3 : lister tel quel donnerait 1,4,2,3, pas l'ordre attendu.
     const list = document.createElement("ul");
-    [r1a.team1_id, r1a.team2_id, r1b.team1_id, r1b.team2_id].forEach((id) => {
+    [r1a.team1_id, r1b.team1_id, r1b.team2_id, r1a.team2_id].forEach((id) => {
       const team = teamsById.get(id);
       if (!team) return;
       const item = document.createElement("li");
@@ -217,27 +244,24 @@ function renderPoules(teamsById, pouleMatches) {
   });
 }
 
+// Les 8 croisements sont toujours affichés, même avant que les poules de qualif
+// soient jouées — avec les placeholders fixes (ex: "2e Poule A") tant que l'équipe
+// réelle n'est pas encore connue, pour que les joueurs voient le chemin complet.
 function renderBarrages(teamsById, barrage1Matches, barrage2Matches) {
   barragesList.innerHTML = "";
 
   const bySlot = new Map([...barrage1Matches, ...barrage2Matches].map((m) => [m.slot, m]));
   const slots = ["qb1", "qb2", "qb3", "qb4", "qb5", "qb6", "qb7", "qb8"];
-  const rows = slots.map((slot) => bySlot.get(slot)).filter(Boolean);
-
-  if (rows.length === 0) {
-    barragesList.textContent = "Les barrages de qualification seront affichés ici une fois les poules terminées.";
-    return;
-  }
 
   const card = document.createElement("div");
   card.className = "pool-card";
 
   const barragesSection = createCollapsibleSection("Barrages de qualification");
-  rows.forEach((match) => {
+  slots.forEach((slot) => {
     barragesSection.content.appendChild(
-      renderMatchRow(match, teamsById, {
-        label: QUALIF_BARRAGE_LABELS[match.slot],
-        team2Placeholder: QUALIF_BARRAGE_PLACEHOLDERS[match.slot],
+      renderMatchRow(bySlot.get(slot), teamsById, {
+        label: QUALIF_BARRAGE_LABELS[slot],
+        placeholders: QUALIF_BARRAGE_PLACEHOLDERS[slot],
       })
     );
   });

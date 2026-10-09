@@ -29,10 +29,18 @@
       <button type="button" class="category-button" data-category="Femmes">Femmes</button>
     </div>
 
-    <h2>Poules de qualification</h2>
-    <div id="qualif-pools-list"></div>
+    <div class="tabs">
+      <button type="button" class="tab-button active" data-subtab="poules">Poules</button>
+      <button type="button" class="tab-button" data-subtab="barrages">Barrages</button>
+    </div>
 
-    <div id="qualif-barrages-list"></div>
+    <div id="subtab-poules" class="tab-panel">
+      <div id="qualif-pools-list"></div>
+    </div>
+
+    <div id="subtab-barrages" class="tab-panel" hidden>
+      <div id="qualif-barrages-list"></div>
+    </div>
 
     <h2>Les Qualifiés pour le Main Draw</h2>
     <div id="qualified-list"></div>
@@ -47,6 +55,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabaseClient.js?v=1"></script>
   <script src="js/nav.js?v=4"></script>
-  <script src="js/qualifs.js?v=3"></script>
+  <script src="js/qualifs.js?v=4"></script>
 </body>
 </html>
