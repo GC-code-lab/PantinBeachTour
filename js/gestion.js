@@ -1861,11 +1861,20 @@ const BRACKET_GROUPS = [
   { label: "Finales", phases: ["petite_finale", "finale"] },
 ];
 
+// Compare deux équipes par ratio de points (marqués / encaissés) sans jamais
+// diviser, pour éviter les soucis de division par zéro (une équipe qui n'a encaissé
+// aucun point) : équivalent à comparer bFor/bAgainst à aFor/aAgainst via un produit
+// en croix. Retourne > 0 si b doit passer devant a (même convention que `b - a`).
+function compareByPointRatio(aFor, aAgainst, bFor, bAgainst) {
+  return bFor * aAgainst - aFor * bAgainst;
+}
+
 // Classe les équipes d'une poule par victoires ; en cas d'égalité de victoires entre
 // plusieurs équipes (2 à égalité, ou "triangulaire" à 3 dans une poule de 4), l'ordre
-// de départage est : 1) pointaverage UNIQUEMENT sur les matchs joués entre les
-// équipes à égalité, 2) si toujours égal, pointaverage face à la ou les équipes HORS
-// du groupe (la "4e équipe"), 3) si toujours égal, rang de tête de série.
+// de départage est : 1) ratio de points (marqués / encaissés, pas une différence)
+// UNIQUEMENT sur les matchs joués entre les équipes à égalité, 2) si toujours égal,
+// ratio de points face à la ou les équipes HORS du groupe (la "4e équipe"), 3) si
+// toujours égal, rang de tête de série.
 function computePoolStandings(pool, teams, poolMatches, seedRankByTeamId) {
   const poolTeams = teams.filter((team) => team.pool_id === pool.id);
   const teamsInPoolMatches = poolMatches.filter((match) => match.pool_id === pool.id);
@@ -1896,8 +1905,10 @@ function computePoolStandings(pool, teams, poolMatches, seedRankByTeamId) {
       }
 
       const groupIds = new Set(group.map((team) => team.id));
-      const subDiff = new Map(group.map((team) => [team.id, 0]));
-      const externalDiff = new Map(group.map((team) => [team.id, 0]));
+      const subFor = new Map(group.map((team) => [team.id, 0]));
+      const subAgainst = new Map(group.map((team) => [team.id, 0]));
+      const externalFor = new Map(group.map((team) => [team.id, 0]));
+      const externalAgainst = new Map(group.map((team) => [team.id, 0]));
 
       teamsInPoolMatches.forEach((match) => {
         const set = match.sets && match.sets[0];
@@ -1905,20 +1916,34 @@ function computePoolStandings(pool, teams, poolMatches, seedRankByTeamId) {
         const inGroup1 = groupIds.has(match.team1_id);
         const inGroup2 = groupIds.has(match.team2_id);
         if (inGroup1 && inGroup2) {
-          subDiff.set(match.team1_id, subDiff.get(match.team1_id) + (set.score_team1 - set.score_team2));
-          subDiff.set(match.team2_id, subDiff.get(match.team2_id) + (set.score_team2 - set.score_team1));
+          subFor.set(match.team1_id, subFor.get(match.team1_id) + set.score_team1);
+          subAgainst.set(match.team1_id, subAgainst.get(match.team1_id) + set.score_team2);
+          subFor.set(match.team2_id, subFor.get(match.team2_id) + set.score_team2);
+          subAgainst.set(match.team2_id, subAgainst.get(match.team2_id) + set.score_team1);
         } else if (inGroup1) {
-          externalDiff.set(match.team1_id, externalDiff.get(match.team1_id) + (set.score_team1 - set.score_team2));
+          externalFor.set(match.team1_id, externalFor.get(match.team1_id) + set.score_team1);
+          externalAgainst.set(match.team1_id, externalAgainst.get(match.team1_id) + set.score_team2);
         } else if (inGroup2) {
-          externalDiff.set(match.team2_id, externalDiff.get(match.team2_id) + (set.score_team2 - set.score_team1));
+          externalFor.set(match.team2_id, externalFor.get(match.team2_id) + set.score_team2);
+          externalAgainst.set(match.team2_id, externalAgainst.get(match.team2_id) + set.score_team1);
         }
       });
 
       const sortedGroup = group.slice().sort((a, b) => {
-        const sub = subDiff.get(b.id) - subDiff.get(a.id);
-        if (sub !== 0) return sub;
-        const ext = externalDiff.get(b.id) - externalDiff.get(a.id);
-        if (ext !== 0) return ext;
+        const ratioCmp = compareByPointRatio(
+          subFor.get(a.id),
+          subAgainst.get(a.id),
+          subFor.get(b.id),
+          subAgainst.get(b.id)
+        );
+        if (ratioCmp !== 0) return ratioCmp;
+        const extCmp = compareByPointRatio(
+          externalFor.get(a.id),
+          externalAgainst.get(a.id),
+          externalFor.get(b.id),
+          externalAgainst.get(b.id)
+        );
+        if (extCmp !== 0) return extCmp;
         return seedRankByTeamId.get(a.id) - seedRankByTeamId.get(b.id);
       });
       ranked.push(...sortedGroup);

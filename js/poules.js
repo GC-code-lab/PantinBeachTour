@@ -171,16 +171,28 @@ function defaultSeedOrder(teams) {
   });
 }
 
-// Classement d'une poule : victoires, puis différence de points, puis tête de série.
-// Important : en cas d'égalité de victoires entre plusieurs équipes (2 à égalité, ou
-// "triangulaire" à 3 dans une poule de 4), l'ordre de départage est : 1) pointaverage
-// (colonne "Diff") calculé UNIQUEMENT sur les matchs joués entre les équipes à
-// égalité, 2) si toujours égal, pointaverage face à la ou les équipes HORS du groupe
-// (la "4e équipe", pas affiché dans le tableau), 3) si toujours égal, tête de série.
+// Compare deux équipes par ratio de points (marqués / encaissés) sans jamais
+// diviser, pour éviter les soucis de division par zéro (une équipe qui n'a encaissé
+// aucun point) : équivalent à comparer bFor/bAgainst à aFor/aAgainst via un produit
+// en croix. Retourne > 0 si b doit passer devant a (même convention que `b - a`).
+function compareByPointRatio(aFor, aAgainst, bFor, bAgainst) {
+  return bFor * aAgainst - aFor * bAgainst;
+}
+
+// Classement d'une poule : victoires, puis ratio de points (marqués / encaissés,
+// pas une différence), puis tête de série. Important : en cas d'égalité de
+// victoires entre plusieurs équipes (2 à égalité, ou "triangulaire" à 3 dans une
+// poule de 4), l'ordre de départage est : 1) ratio de points calculé UNIQUEMENT
+// sur les matchs joués entre les équipes à égalité, 2) si toujours égal, ratio de
+// points face à la ou les équipes HORS du groupe (la "4e équipe", pas affiché dans
+// le tableau), 3) si toujours égal, tête de série.
 function computePoolStandings(pool, teamsInPool, poolMatches, seedRankByTeamId) {
   const teamsInPoolMatches = poolMatches.filter((match) => match.pool_id === pool.id);
   const stats = new Map(
-    teamsInPool.map((team) => [team.id, { team, wins: 0, losses: 0, diff: 0, externalDiff: 0 }])
+    teamsInPool.map((team) => [
+      team.id,
+      { team, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0, externalFor: 0, externalAgainst: 0 },
+    ])
   );
 
   teamsInPoolMatches.forEach((match) => {
@@ -211,14 +223,19 @@ function computePoolStandings(pool, teamsInPool, poolMatches, seedRankByTeamId) 
       const group = groupsByWins.get(winCount);
 
       if (group.length === 1) {
-        // Seule dans son groupe : pas de départage à faire, la diff affichée compte
+        // Seule dans son groupe : pas de départage à faire, le ratio affiché compte
         // tous ses matchs de poule (y compris contre des équipes d'autres groupes).
         const solo = group[0];
         teamsInPoolMatches.forEach((match) => {
           const set = match.sets && match.sets[0];
           if (!set) return;
-          if (match.team1_id === solo.team.id) solo.diff += set.score_team1 - set.score_team2;
-          else if (match.team2_id === solo.team.id) solo.diff += set.score_team2 - set.score_team1;
+          if (match.team1_id === solo.team.id) {
+            solo.pointsFor += set.score_team1;
+            solo.pointsAgainst += set.score_team2;
+          } else if (match.team2_id === solo.team.id) {
+            solo.pointsFor += set.score_team2;
+            solo.pointsAgainst += set.score_team1;
+          }
         });
         ranked.push(solo);
         return;
@@ -231,26 +248,35 @@ function computePoolStandings(pool, teamsInPool, poolMatches, seedRankByTeamId) 
         const inGroup1 = groupIds.has(match.team1_id);
         const inGroup2 = groupIds.has(match.team2_id);
         if (inGroup1 && inGroup2) {
-          stats.get(match.team1_id).diff += set.score_team1 - set.score_team2;
-          stats.get(match.team2_id).diff += set.score_team2 - set.score_team1;
+          stats.get(match.team1_id).pointsFor += set.score_team1;
+          stats.get(match.team1_id).pointsAgainst += set.score_team2;
+          stats.get(match.team2_id).pointsFor += set.score_team2;
+          stats.get(match.team2_id).pointsAgainst += set.score_team1;
         } else if (inGroup1) {
-          stats.get(match.team1_id).externalDiff += set.score_team1 - set.score_team2;
+          stats.get(match.team1_id).externalFor += set.score_team1;
+          stats.get(match.team1_id).externalAgainst += set.score_team2;
         } else if (inGroup2) {
-          stats.get(match.team2_id).externalDiff += set.score_team2 - set.score_team1;
+          stats.get(match.team2_id).externalFor += set.score_team2;
+          stats.get(match.team2_id).externalAgainst += set.score_team1;
         }
       });
 
       const sortedGroup = group.slice().sort((a, b) => {
-        const diff = b.diff - a.diff;
-        if (diff !== 0) return diff;
-        const ext = b.externalDiff - a.externalDiff;
-        if (ext !== 0) return ext;
+        const ratioCmp = compareByPointRatio(a.pointsFor, a.pointsAgainst, b.pointsFor, b.pointsAgainst);
+        if (ratioCmp !== 0) return ratioCmp;
+        const extCmp = compareByPointRatio(a.externalFor, a.externalAgainst, b.externalFor, b.externalAgainst);
+        if (extCmp !== 0) return extCmp;
         return seedRankByTeamId.get(a.team.id) - seedRankByTeamId.get(b.team.id);
       });
       ranked.push(...sortedGroup);
     });
 
   return ranked;
+}
+
+function formatPointRatio(pointsFor, pointsAgainst) {
+  if (pointsAgainst === 0) return pointsFor > 0 ? "∞" : "0.00";
+  return (pointsFor / pointsAgainst).toFixed(2);
 }
 
 function renderStandingsTable(standings, seedRankByTeamId) {
@@ -262,14 +288,14 @@ function renderStandingsTable(standings, seedRankByTeamId) {
 
   const thead = document.createElement("thead");
   thead.innerHTML =
-    "<tr><th>Rang</th><th>Équipe</th><th>V</th><th>D</th><th>Diff</th><th>Tête de série</th></tr>";
+    "<tr><th>Rang</th><th>Équipe</th><th>V</th><th>D</th><th>Ratio</th><th>Tête de série</th></tr>";
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
   standings.forEach((s, index) => {
     const row = document.createElement("tr");
-    const diffLabel = s.diff > 0 ? `+${s.diff}` : `${s.diff}`;
-    row.innerHTML = `<td>${index + 1}</td><td>${formatTeamNames(s.team)}</td><td>${s.wins}</td><td>${s.losses}</td><td>${diffLabel}</td><td>n°${seedRankByTeamId.get(s.team.id)}</td>`;
+    const ratioLabel = formatPointRatio(s.pointsFor, s.pointsAgainst);
+    row.innerHTML = `<td>${index + 1}</td><td>${formatTeamNames(s.team)}</td><td>${s.wins}</td><td>${s.losses}</td><td>${ratioLabel}</td><td>n°${seedRankByTeamId.get(s.team.id)}</td>`;
     tbody.appendChild(row);
   });
   table.appendChild(tbody);
