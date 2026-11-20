@@ -1,7 +1,6 @@
 // Page publique "Suivi d'équipe" : cherche une paire par nom de joueur, affiche tous
 // ses matchs (connus en base) triés chronologiquement avec horaire + terrain (déduits
-// des mêmes plannings que js/ordre-des-matchs.js — dupliqués ici volontairement, ce
-// site n'a pas de module JS partagé entre pages). Chaque match a un lien vers sa ligne
+// des plannings partagés de js/tournoi-commun.js). Chaque match a un lien vers sa ligne
 // dans "Ordre des matchs" ; quand l'adversaire n'est pas encore connu mais déductible
 // (ex: "vainqueur du Barrage 2"), ce texte est lui aussi cliquable.
 
@@ -11,138 +10,6 @@ const trackingSection = document.getElementById("tracking-section");
 
 let allTeams = [];
 let selectedTeam = null;
-
-// --- Mêmes plannings/terrains que js/ordre-des-matchs.js (tenir synchronisés si l'un change) ---
-
-const GENDER_TERRAINS = { Hommes: [2, 3], Femmes: [1, 4] };
-
-const MAINDRAW_SCHEDULE = [
-  { time: "9h00", kind: "poolPair", pools: ["Poule B", "Poule C"], round: 0 },
-  { time: "9h30", kind: "poolPair", pools: ["Poule A", "Poule D"], round: 0 },
-  { time: "10h00", kind: "poolPair", pools: ["Poule B", "Poule C"], round: 1 },
-  { time: "10h30", kind: "poolPair", pools: ["Poule A", "Poule D"], round: 1 },
-  { time: "11h00", kind: "poolPair", pools: ["Poule B", "Poule C"], round: 2 },
-  { time: "11h30", kind: "poolPair", pools: ["Poule A", "Poule D"], round: 2 },
-  { time: "12h00", kind: "slotPair", slots: ["barrage-1", "barrage-2"] },
-  { time: "12h45", kind: "slotPair", slots: ["barrage-3", "barrage-4"] },
-  { time: "13h30", kind: "slotPair", slots: ["qf-1", "qf-2"] },
-  { time: "14h15", kind: "slotPair", slots: ["qf-3", "qf-4"] },
-  { time: "15h15", kind: "slotPair", slots: ["sf-1", "sf-2"] },
-  { time: "16h15", kind: "slotPair", slots: ["finale", "petite-finale"] },
-];
-
-const QUALIF_SCHEDULE = [
-  { time: "9h00", kind: "poolRound", poolLetter: "B", round: 0 },
-  { time: "9h45", kind: "poolRound", poolLetter: "D", round: 0 },
-  { time: "10h30", kind: "poolRound", poolLetter: "A", round: 0 },
-  { time: "11h15", kind: "poolRound", poolLetter: "C", round: 0 },
-  { time: "12h00", kind: "poolRound", poolLetter: "B", round: 1 },
-  { time: "12h45", kind: "poolRound", poolLetter: "D", round: 1 },
-  { time: "13h30", kind: "poolRound", poolLetter: "A", round: 1 },
-  { time: "14h15", kind: "poolRound", poolLetter: "C", round: 1 },
-  { time: "15h00", kind: "slotPair", slots: ["qb2", "qb4"] },
-  { time: "15h45", kind: "slotPair", slots: ["qb1", "qb3"] },
-  { time: "16h30", kind: "slotPair", slots: ["qb5", "qb7"] },
-  { time: "17h15", kind: "slotPair", slots: ["qb6", "qb8"] },
-];
-
-function qualifRoundSlots(letter, round) {
-  return round === 0 ? [`q${letter}-r1-1`, `q${letter}-r1-2`] : [`q${letter}-r2-w`, `q${letter}-r2-l`];
-}
-
-const SLOT_LABELS = {
-  "sf-1": "Demi 1",
-  "sf-2": "Demi 2",
-  "petite-finale": "Petite finale",
-  finale: "Finale",
-};
-
-function slotLabel(slot) {
-  if (SLOT_LABELS[slot]) return SLOT_LABELS[slot];
-  if (slot.startsWith("barrage-")) return `Barrage ${slot.split("-")[1]}`;
-  if (slot.startsWith("qf-")) return `Quart ${slot.split("-")[1]}`;
-  if (slot.startsWith("qb")) return `Barrage qualif ${slot.slice(2)}`;
-  const qualifPool = slot.match(/^q([A-D])-r(\d)-(.+)$/);
-  if (qualifPool) {
-    const [, letter, round, part] = qualifPool;
-    if (round === "1") return `Poule Qualif ${letter}`;
-    return `Poule Qualif ${letter} (${part === "w" ? "vainqueurs" : "perdants"})`;
-  }
-  return slot;
-}
-
-const SLOT_PLACEHOLDERS = {
-  "barrage-1": ["2e Poule C", "3e Poule B"],
-  "barrage-2": ["2e Poule B", "3e Poule C"],
-  "barrage-3": ["2e Poule D", "3e Poule A"],
-  "barrage-4": ["2e Poule A", "3e Poule D"],
-  "qf-1": ["1er Poule A", "Vainqueur Barrage 2"],
-  "qf-2": ["1er Poule D", "Vainqueur Barrage 1"],
-  "qf-3": ["1er Poule B", "Vainqueur Barrage 4"],
-  "qf-4": ["1er Poule C", "Vainqueur Barrage 3"],
-  "sf-1": ["Vainqueur Quart 1", "Vainqueur Quart 2"],
-  "sf-2": ["Vainqueur Quart 3", "Vainqueur Quart 4"],
-  finale: ["Vainqueur Demi 1", "Vainqueur Demi 2"],
-  "petite-finale": ["Perdant Demi 1", "Perdant Demi 2"],
-  qb1: ["2e Poule A", "3e Poule C"],
-  qb2: ["2e Poule B", "3e Poule D"],
-  qb3: ["2e Poule C", "3e Poule A"],
-  qb4: ["2e Poule D", "3e Poule B"],
-  qb5: ["1er Poule A", "Vainqueur Barrage qualif 2"],
-  qb6: ["1er Poule B", "Vainqueur Barrage qualif 1"],
-  qb7: ["1er Poule C", "Vainqueur Barrage qualif 4"],
-  qb8: ["1er Poule D", "Vainqueur Barrage qualif 3"],
-};
-
-// Même table que BRACKET_PROGRESSION dans js/gestion.js — qui gagne va où ensuite, et à
-// quelle "place" (team1_id/team2_id) du match suivant, pour savoir déterministement de
-// quel côté sera l'équipe suivie et donc décrire précisément son futur adversaire.
-const BRACKET_PROGRESSION = {
-  "barrage-1": { winner: { nextSlot: "qf-2", position: "team2_id" } },
-  "barrage-2": { winner: { nextSlot: "qf-1", position: "team2_id" } },
-  "barrage-3": { winner: { nextSlot: "qf-4", position: "team2_id" } },
-  "barrage-4": { winner: { nextSlot: "qf-3", position: "team2_id" } },
-  "qf-1": { winner: { nextSlot: "sf-1", position: "team1_id" } },
-  "qf-2": { winner: { nextSlot: "sf-1", position: "team2_id" } },
-  "qf-3": { winner: { nextSlot: "sf-2", position: "team1_id" } },
-  "qf-4": { winner: { nextSlot: "sf-2", position: "team2_id" } },
-  "sf-1": {
-    winner: { nextSlot: "finale", position: "team1_id" },
-    loser: { nextSlot: "petite-finale", position: "team1_id" },
-  },
-  "sf-2": {
-    winner: { nextSlot: "finale", position: "team2_id" },
-    loser: { nextSlot: "petite-finale", position: "team2_id" },
-  },
-  "qA-r1-1": { winner: { nextSlot: "qA-r2-w", position: "team1_id" }, loser: { nextSlot: "qA-r2-l", position: "team1_id" } },
-  "qA-r1-2": { winner: { nextSlot: "qA-r2-w", position: "team2_id" }, loser: { nextSlot: "qA-r2-l", position: "team2_id" } },
-  "qB-r1-1": { winner: { nextSlot: "qB-r2-w", position: "team1_id" }, loser: { nextSlot: "qB-r2-l", position: "team1_id" } },
-  "qB-r1-2": { winner: { nextSlot: "qB-r2-w", position: "team2_id" }, loser: { nextSlot: "qB-r2-l", position: "team2_id" } },
-  "qC-r1-1": { winner: { nextSlot: "qC-r2-w", position: "team1_id" }, loser: { nextSlot: "qC-r2-l", position: "team1_id" } },
-  "qC-r1-2": { winner: { nextSlot: "qC-r2-w", position: "team2_id" }, loser: { nextSlot: "qC-r2-l", position: "team2_id" } },
-  "qD-r1-1": { winner: { nextSlot: "qD-r2-w", position: "team1_id" }, loser: { nextSlot: "qD-r2-l", position: "team1_id" } },
-  "qD-r1-2": { winner: { nextSlot: "qD-r2-w", position: "team2_id" }, loser: { nextSlot: "qD-r2-l", position: "team2_id" } },
-  qb1: { winner: { nextSlot: "qb6", position: "team2_id" } },
-  qb2: { winner: { nextSlot: "qb5", position: "team2_id" } },
-  qb3: { winner: { nextSlot: "qb8", position: "team2_id" } },
-  qb4: { winner: { nextSlot: "qb7", position: "team2_id" } },
-};
-
-// Cherche dans BRACKET_PROGRESSION le slot dont le gagnant (ou perdant) rejoint
-// `nextSlot` à la place `position` — ex: findSourceSlot("qf-1", "team2_id") renvoie
-// "barrage-2". Utilisé pour savoir quel match précis décide de l'adversaire d'un match
-// pas encore joué, et donc pouvoir y créer un lien.
-function findSourceSlot(nextSlot, position) {
-  for (const [slot, progression] of Object.entries(BRACKET_PROGRESSION)) {
-    if (progression.winner && progression.winner.nextSlot === nextSlot && progression.winner.position === position) {
-      return slot;
-    }
-    if (progression.loser && progression.loser.nextSlot === nextSlot && progression.loser.position === position) {
-      return slot;
-    }
-  }
-  return null;
-}
 
 // Qualif ou Main-draw ? Détermine vers quel onglet de "Ordre des matchs" un slot pointe.
 function slotDay(slot) {
@@ -167,14 +34,14 @@ function resolveOpponent(slot, position, matchRecord, teamsById) {
     return { text: teamShortName(teamsById.get(otherTeamId)), linkSlot: null };
   }
 
-  const sourceSlot = slot ? findSourceSlot(slot, otherPosition) : null;
-  if (sourceSlot) {
-    return { text: `vainqueur de ${slotLabel(sourceSlot)}`, linkSlot: sourceSlot };
+  const source = slot ? findSourceSlot(slot, otherPosition) : null;
+  if (source) {
+    const verb = source.outcome === "winner" ? "vainqueur" : "perdant";
+    return { text: `${verb} de ${slotLabel(source.slot)}`, linkSlot: source.slot };
   }
 
-  const placeholder = slot ? SLOT_PLACEHOLDERS[slot] : null;
-  if (placeholder) {
-    return { text: placeholder[otherPosition === "team1_id" ? 0 : 1], linkSlot: null };
+  if (slot) {
+    return { text: slotPlaceholder(slot, otherPosition === "team1_id" ? 0 : 1), linkSlot: null };
   }
 
   return { text: "pas encore connu", linkSlot: null };
@@ -195,8 +62,7 @@ function teamName(team) {
 }
 
 function teamShortName(team) {
-  if (!team) return "?";
-  return `${team.player1_prenom} ${team.player1_nom.charAt(0)}. / ${team.player2_prenom} ${team.player2_nom.charAt(0)}.`;
+  return formatTeamShort(team);
 }
 
 searchInput.addEventListener("input", () => {
@@ -257,20 +123,15 @@ async function loadTeamTimeline(team) {
   trackingSection.hidden = false;
   trackingSection.innerHTML = "Chargement…";
 
-  const { data: teams, error: teamsError } = await supabaseClient
-    .from("teams")
-    .select("*")
-    .eq("category", team.category);
-
-  const { data: pools, error: poolsError } = await supabaseClient
-    .from("pools")
-    .select("*")
-    .eq("category", team.category);
-
-  const { data: matches, error: matchesError } = await supabaseClient
-    .from("matches")
-    .select("*, sets(*)")
-    .eq("category", team.category);
+  const [
+    { data: teams, error: teamsError },
+    { data: pools, error: poolsError },
+    { data: matches, error: matchesError },
+  ] = await Promise.all([
+    supabaseClient.from("teams").select("*").eq("category", team.category),
+    supabaseClient.from("pools").select("*").eq("category", team.category),
+    supabaseClient.from("matches").select("*, sets(*)").eq("category", team.category),
+  ]);
 
   if (teamsError || poolsError || matchesError) {
     trackingSection.textContent = "Erreur de chargement.";
@@ -362,14 +223,6 @@ function scheduleSortKey(schedule) {
   return dayOffset * 10000 + timeToMinutes(schedule.time);
 }
 
-function formatSetsScore(sets) {
-  return sets
-    .slice()
-    .sort((a, b) => a.set_number - b.set_number)
-    .map((set) => `${set.score_team1}-${set.score_team2}`)
-    .join(" / ");
-}
-
 // --- Rendu ---
 
 function renderTimeline(team, teamsById, confirmed) {
@@ -406,16 +259,11 @@ function matchAnchor(category, slot, matchId) {
   return slot ? `slot:${category}:${slot}` : `match:${matchId}`;
 }
 
-// "win"/"loss" une fois le match tranché (assez de sets gagnés pour sa phase), sinon
-// null (match en cours ou pas encore joué — pas de verdict à afficher).
+// "win"/"loss" une fois le match tranché, sinon null (pas de verdict à afficher).
 function matchOutcomeForTeam(match, teamId) {
-  const sets = (match && match.sets) || [];
-  const needed = match.phase === "poule" ? 1 : 2;
-  const wins1 = sets.filter((s) => s.score_team1 > s.score_team2).length;
-  const wins2 = sets.filter((s) => s.score_team2 > s.score_team1).length;
-  if (wins1 < needed && wins2 < needed) return null;
-  const winnerId = wins1 >= needed ? match.team1_id : match.team2_id;
-  return winnerId === teamId ? "win" : "loss";
+  const result = matchResult(match);
+  if (!result) return null;
+  return result.winnerId === teamId ? "win" : "loss";
 }
 
 function renderMatchCard(team, teamsById, match, schedule) {

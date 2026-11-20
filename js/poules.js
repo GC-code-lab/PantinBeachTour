@@ -12,25 +12,25 @@ categoryButtons.forEach((button) => {
 });
 
 async function loadPools() {
-  const { data: pools, error: poolsError } = await supabaseClient
-    .from("pools")
-    .select("*")
-    .eq("category", currentCategory)
-    .order("label");
-
-  const { data: teams, error: teamsError } = await supabaseClient
-    .from("teams")
-    .select("*")
-    .eq("category", currentCategory)
-    .order("seed", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: true });
-
-  const { data: matches, error: matchesError } = await supabaseClient
-    .from("matches")
-    .select("*, sets(*)")
-    .eq("phase", "poule")
-    .eq("category", currentCategory)
-    .order("id", { ascending: true });
+  const [
+    { data: pools, error: poolsError },
+    { data: teams, error: teamsError },
+    { data: matches, error: matchesError },
+  ] = await Promise.all([
+    supabaseClient.from("pools").select("*").eq("category", currentCategory).order("label"),
+    supabaseClient
+      .from("teams")
+      .select("*")
+      .eq("category", currentCategory)
+      .order("seed", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true }),
+    supabaseClient
+      .from("matches")
+      .select("*, sets(*)")
+      .eq("phase", "poule")
+      .eq("category", currentCategory)
+      .order("id", { ascending: true }),
+  ]);
 
   if (poolsError || teamsError || matchesError) {
     poolsList.textContent = "Erreur de chargement des poules.";
@@ -38,9 +38,8 @@ async function loadPools() {
   }
 
   if (pools.length === 0) {
-    const { data: formatData } = await supabaseClient.from("tournament_formats").select("format").maybeSingle();
-    const isQuali16 = Boolean(formatData && formatData.format === "12-quali16");
-    if (isQuali16 && teams.length >= 24) {
+    const format = await fetchTournamentFormat();
+    if (format === "12-quali16" && teams.length >= 24) {
       renderMaindrawPreview(teams);
       return;
     }
@@ -72,11 +71,7 @@ function renderMaindrawPreview(teams) {
   const qualifTeams = ordered.slice(8, 24);
   const maxQualifPoints = Math.max(...qualifTeams.map(teamPoints));
 
-  const sortedDirect = directTeams.slice().sort((a, b) => {
-    const diff = teamPoints(b) - teamPoints(a);
-    if (diff !== 0) return diff;
-    return new Date(a.created_at) - new Date(b.created_at);
-  });
+  const sortedDirect = directTeams.slice().sort(compareByPoints);
 
   const confirmed = [];
   const uncertain = [];
@@ -145,133 +140,8 @@ function renderMaindrawPreview(teams) {
   poolsList.appendChild(wrapper);
 }
 
-function formatTeamDetail(team) {
-  return `${team.player1_prenom} ${team.player1_nom} / ${team.player2_prenom} ${team.player2_nom}`;
-}
-
 function formatTeamNames(team) {
   return `${team.player1_nom} / ${team.player2_nom}`;
-}
-
-function teamPoints(team) {
-  return Number(team.points || 0);
-}
-
-// Même logique que côté admin (js/gestion.js) : tant qu'aucun classement manuel n'a
-// été fait (teams.seed tous null), l'ordre par défaut des têtes de série vient des
-// points de la paire — c'est ce qui sert de dernier critère de départage public.
-function defaultSeedOrder(teams) {
-  const hasManualSeed = teams.some((team) => team.seed != null);
-  if (hasManualSeed) return teams;
-
-  return teams.slice().sort((a, b) => {
-    const diff = teamPoints(b) - teamPoints(a);
-    if (diff !== 0) return diff;
-    return new Date(a.created_at) - new Date(b.created_at);
-  });
-}
-
-// Compare deux équipes par ratio de points (marqués / encaissés) sans jamais
-// diviser, pour éviter les soucis de division par zéro (une équipe qui n'a encaissé
-// aucun point) : équivalent à comparer bFor/bAgainst à aFor/aAgainst via un produit
-// en croix. Retourne > 0 si b doit passer devant a (même convention que `b - a`).
-function compareByPointRatio(aFor, aAgainst, bFor, bAgainst) {
-  return bFor * aAgainst - aFor * bAgainst;
-}
-
-// Classement d'une poule : victoires, puis ratio de points (marqués / encaissés,
-// pas une différence), puis tête de série. Important : en cas d'égalité de
-// victoires entre plusieurs équipes (2 à égalité, ou "triangulaire" à 3 dans une
-// poule de 4), l'ordre de départage est : 1) ratio de points calculé UNIQUEMENT
-// sur les matchs joués entre les équipes à égalité, 2) si toujours égal, ratio de
-// points face à la ou les équipes HORS du groupe (la "4e équipe", pas affiché dans
-// le tableau), 3) si toujours égal, tête de série.
-function computePoolStandings(pool, teamsInPool, poolMatches, seedRankByTeamId) {
-  const teamsInPoolMatches = poolMatches.filter((match) => match.pool_id === pool.id);
-  const stats = new Map(
-    teamsInPool.map((team) => [
-      team.id,
-      { team, wins: 0, losses: 0, pointsFor: 0, pointsAgainst: 0, externalFor: 0, externalAgainst: 0 },
-    ])
-  );
-
-  teamsInPoolMatches.forEach((match) => {
-    const set = match.sets && match.sets[0];
-    const stats1 = stats.get(match.team1_id);
-    const stats2 = stats.get(match.team2_id);
-    if (!set || !stats1 || !stats2) return;
-
-    if (set.score_team1 > set.score_team2) {
-      stats1.wins += 1;
-      stats2.losses += 1;
-    } else {
-      stats2.wins += 1;
-      stats1.losses += 1;
-    }
-  });
-
-  const groupsByWins = new Map();
-  stats.forEach((s) => {
-    if (!groupsByWins.has(s.wins)) groupsByWins.set(s.wins, []);
-    groupsByWins.get(s.wins).push(s);
-  });
-
-  const ranked = [];
-  [...groupsByWins.keys()]
-    .sort((a, b) => b - a)
-    .forEach((winCount) => {
-      const group = groupsByWins.get(winCount);
-
-      if (group.length === 1) {
-        // Seule dans son groupe : pas de départage à faire, le ratio affiché compte
-        // tous ses matchs de poule (y compris contre des équipes d'autres groupes).
-        const solo = group[0];
-        teamsInPoolMatches.forEach((match) => {
-          const set = match.sets && match.sets[0];
-          if (!set) return;
-          if (match.team1_id === solo.team.id) {
-            solo.pointsFor += set.score_team1;
-            solo.pointsAgainst += set.score_team2;
-          } else if (match.team2_id === solo.team.id) {
-            solo.pointsFor += set.score_team2;
-            solo.pointsAgainst += set.score_team1;
-          }
-        });
-        ranked.push(solo);
-        return;
-      }
-
-      const groupIds = new Set(group.map((s) => s.team.id));
-      teamsInPoolMatches.forEach((match) => {
-        const set = match.sets && match.sets[0];
-        if (!set) return;
-        const inGroup1 = groupIds.has(match.team1_id);
-        const inGroup2 = groupIds.has(match.team2_id);
-        if (inGroup1 && inGroup2) {
-          stats.get(match.team1_id).pointsFor += set.score_team1;
-          stats.get(match.team1_id).pointsAgainst += set.score_team2;
-          stats.get(match.team2_id).pointsFor += set.score_team2;
-          stats.get(match.team2_id).pointsAgainst += set.score_team1;
-        } else if (inGroup1) {
-          stats.get(match.team1_id).externalFor += set.score_team1;
-          stats.get(match.team1_id).externalAgainst += set.score_team2;
-        } else if (inGroup2) {
-          stats.get(match.team2_id).externalFor += set.score_team2;
-          stats.get(match.team2_id).externalAgainst += set.score_team1;
-        }
-      });
-
-      const sortedGroup = group.slice().sort((a, b) => {
-        const ratioCmp = compareByPointRatio(a.pointsFor, a.pointsAgainst, b.pointsFor, b.pointsAgainst);
-        if (ratioCmp !== 0) return ratioCmp;
-        const extCmp = compareByPointRatio(a.externalFor, a.externalAgainst, b.externalFor, b.externalAgainst);
-        if (extCmp !== 0) return extCmp;
-        return seedRankByTeamId.get(a.team.id) - seedRankByTeamId.get(b.team.id);
-      });
-      ranked.push(...sortedGroup);
-    });
-
-  return ranked;
 }
 
 function formatPointRatio(pointsFor, pointsAgainst) {
@@ -294,8 +164,19 @@ function renderStandingsTable(standings, seedRankByTeamId) {
   const tbody = document.createElement("tbody");
   standings.forEach((s, index) => {
     const row = document.createElement("tr");
-    const ratioLabel = formatPointRatio(s.pointsFor, s.pointsAgainst);
-    row.innerHTML = `<td>${index + 1}</td><td>${formatTeamNames(s.team)}</td><td>${s.wins}</td><td>${s.losses}</td><td>${ratioLabel}</td><td>n°${seedRankByTeamId.get(s.team.id)}</td>`;
+    // textContent (pas innerHTML) : les noms d'équipe viennent d'une saisie libre.
+    [
+      index + 1,
+      formatTeamNames(s.team),
+      s.wins,
+      s.losses,
+      formatPointRatio(s.pointsFor, s.pointsAgainst),
+      `n°${seedRankByTeamId.get(s.team.id)}`,
+    ].forEach((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.appendChild(cell);
+    });
     tbody.appendChild(row);
   });
   table.appendChild(tbody);
@@ -364,56 +245,17 @@ function renderPools(pools, teams, matches) {
   });
 }
 
-// Un bouton-titre repliable + son contenu, utilisé pour "Matchs et résultats" et
-// "Classement" sous chaque poule (replié par défaut).
-function createCollapsibleSection(title) {
-  const header = document.createElement("button");
-  header.type = "button";
-  header.className = "pool-card-header";
-  header.setAttribute("aria-expanded", "false");
-
-  const labelSpan = document.createElement("span");
-  labelSpan.textContent = title;
-  header.appendChild(labelSpan);
-
-  const chevron = document.createElement("span");
-  chevron.className = "pool-card-chevron";
-  chevron.textContent = "▾";
-  header.appendChild(chevron);
-
-  const content = document.createElement("div");
-  content.className = "pool-card-content";
-  content.hidden = true;
-
-  header.addEventListener("click", () => {
-    const isOpen = header.getAttribute("aria-expanded") === "true";
-    header.setAttribute("aria-expanded", String(!isOpen));
-    content.hidden = isOpen;
-  });
-
-  const section = document.createElement("div");
-  section.className = "pool-card-section";
-  section.appendChild(header);
-  section.appendChild(content);
-
-  return { header, content, section };
-}
-
-function matchTeamLabel(team) {
-  return `${team.player1_prenom} ${team.player1_nom.charAt(0)}. / ${team.player2_prenom} ${team.player2_nom.charAt(0)}.`;
-}
-
 function renderMatchRow(match, teamsById) {
   const team1 = teamsById.get(match.team1_id);
   const team2 = teamsById.get(match.team2_id);
   const existingSet = match.sets && match.sets[0];
 
   const row = document.createElement("div");
-  row.className = "match-row";
+  row.className = match.status === "termine" ? "match-row match-row-done" : "match-row";
 
   const team1Span = document.createElement("span");
   team1Span.className = "match-team";
-  team1Span.textContent = matchTeamLabel(team1);
+  team1Span.textContent = formatTeamShort(team1);
   row.appendChild(team1Span);
 
   if (existingSet) {
@@ -430,7 +272,7 @@ function renderMatchRow(match, teamsById) {
 
   const team2Span = document.createElement("span");
   team2Span.className = "match-team team2";
-  team2Span.textContent = matchTeamLabel(team2);
+  team2Span.textContent = formatTeamShort(team2);
   row.appendChild(team2Span);
 
   return row;

@@ -35,79 +35,24 @@ subTabButtons.forEach((button) => {
 });
 
 // Croisement connu à l'avance par le format (toujours affiché, même avant que les
-// poules de qualif soient jouées) — même convention que côté admin (js/gestion.js)
-// et "Ordre des matchs".
-const QUALIF_BARRAGE_PLACEHOLDERS = {
-  qb1: ["2e Poule A", "3e Poule C"],
-  qb2: ["2e Poule B", "3e Poule D"],
-  qb3: ["2e Poule C", "3e Poule A"],
-  qb4: ["2e Poule D", "3e Poule B"],
-  qb5: ["1er Poule A", "Vainqueur du Barrage 2"],
-  qb6: ["1er Poule B", "Vainqueur du Barrage 1"],
-  qb7: ["1er Poule C", "Vainqueur du Barrage 4"],
-  qb8: ["1er Poule D", "Vainqueur du Barrage 3"],
-};
-
-function matchTeamLabel(team) {
-  return `${team.player1_prenom} ${team.player1_nom.charAt(0)}. / ${team.player2_prenom} ${team.player2_nom.charAt(0)}.`;
+// poules de qualif soient jouées), avec un libellé explicite pour le 2e tour :
+// "Vainqueur du Barrage 2" plutôt qu'un "À déterminer" générique.
+function qualifBarrageLabel(slot) {
+  return `Barrage ${slot.slice(2)}`;
 }
 
-function formatTeamDetail(team) {
-  return `${team.player1_prenom} ${team.player1_nom} / ${team.player2_prenom} ${team.player2_nom}`;
+function qualifPlaceholder(slot, index) {
+  return slotPlaceholder(slot, index, { sourceLabel: (source) => `du ${qualifBarrageLabel(source)}` });
 }
 
-function formatSetsScore(sets) {
-  return sets
-    .slice()
-    .sort((a, b) => a.set_number - b.set_number)
-    .map((set) => `${set.score_team1}-${set.score_team2}`)
-    .join(" / ");
-}
-
-// Un bouton-titre repliable + son contenu (identique à js/poules.js), replié par défaut.
-function createCollapsibleSection(title) {
-  const header = document.createElement("button");
-  header.type = "button";
-  header.className = "pool-card-header";
-  header.setAttribute("aria-expanded", "false");
-
-  const labelSpan = document.createElement("span");
-  labelSpan.textContent = title;
-  header.appendChild(labelSpan);
-
-  const chevron = document.createElement("span");
-  chevron.className = "pool-card-chevron";
-  chevron.textContent = "▾";
-  header.appendChild(chevron);
-
-  const content = document.createElement("div");
-  content.className = "pool-card-content";
-  content.hidden = true;
-
-  header.addEventListener("click", () => {
-    const isOpen = header.getAttribute("aria-expanded") === "true";
-    header.setAttribute("aria-expanded", String(!isOpen));
-    content.hidden = isOpen;
-  });
-
-  const section = document.createElement("div");
-  section.className = "pool-card-section";
-  section.appendChild(header);
-  section.appendChild(content);
-
-  return { header, content, section };
-}
-
-// `match` peut être absent (pas encore créé côté admin) — dans ce cas, `placeholders`
-// (un tableau [texte équipe 1, texte équipe 2]) prend le relais pour afficher le
-// croisement connu à l'avance par le format, plutôt qu'un "À déterminer" générique.
-function renderMatchRow(match, teamsById, { label, placeholders } = {}) {
+// Une ligne de match de poule de qualif (lecture seule).
+function renderMatchRow(match, teamsById, { label } = {}) {
   const team1 = match ? teamsById.get(match.team1_id) : null;
   const team2 = match ? teamsById.get(match.team2_id) : null;
   const sets = (match && match.sets) || [];
 
   const row = document.createElement("div");
-  row.className = "match-row";
+  row.className = match && match.status === "termine" ? "match-row match-row-done" : "match-row";
 
   if (label) {
     const tag = document.createElement("span");
@@ -118,7 +63,7 @@ function renderMatchRow(match, teamsById, { label, placeholders } = {}) {
 
   const team1Span = document.createElement("span");
   team1Span.className = "match-team";
-  team1Span.textContent = team1 ? matchTeamLabel(team1) : (placeholders && placeholders[0]) || "À déterminer";
+  team1Span.textContent = team1 ? formatTeamShort(team1) : "À déterminer";
   row.appendChild(team1Span);
 
   if (sets.length > 0) {
@@ -135,32 +80,10 @@ function renderMatchRow(match, teamsById, { label, placeholders } = {}) {
 
   const team2Span = document.createElement("span");
   team2Span.className = "match-team team2";
-  team2Span.textContent = team2 ? matchTeamLabel(team2) : (placeholders && placeholders[1]) || "À déterminer";
+  team2Span.textContent = team2 ? formatTeamShort(team2) : "À déterminer";
   row.appendChild(team2Span);
 
   return row;
-}
-
-// Vainqueur/perdant d'un match tranché (il faut 2 sets gagnés) — null si pas encore joué.
-function matchWinnerLoser(match) {
-  const sets = (match && match.sets) || [];
-  const wins1 = sets.filter((s) => s.score_team1 > s.score_team2).length;
-  const wins2 = sets.filter((s) => s.score_team2 > s.score_team1).length;
-  if (wins1 >= 2) return { winnerId: match.team1_id, loserId: match.team2_id };
-  if (wins2 >= 2) return { winnerId: match.team2_id, loserId: match.team1_id };
-  return null;
-}
-
-// Classement 1-2-3-4 d'une poule brésilienne : vainqueur/perdant du match des
-// vainqueurs (places 1-2), puis vainqueur/perdant du match des perdants (3-4).
-function computeBresilienneStandings(r2w, r2l, teamsById) {
-  if (!r2w || !r2l) return null;
-  const roundWinners = matchWinnerLoser(r2w);
-  const roundLosers = matchWinnerLoser(r2l);
-  if (!roundWinners || !roundLosers) return null;
-  return [roundWinners.winnerId, roundWinners.loserId, roundLosers.winnerId, roundLosers.loserId].map(
-    (id) => teamsById.get(id)
-  );
 }
 
 function renderStandingsList(teamsRanked) {
@@ -218,7 +141,8 @@ function renderPoules(teamsById, pouleMatches) {
     card.appendChild(matchesSection.section);
 
     const standingsSection = createCollapsibleSection("Classement");
-    const standings = computeBresilienneStandings(r2w, r2l, teamsById);
+    const standingIds = computeBresilienneStandings(letter, bySlot);
+    const standings = standingIds && standingIds.map((id) => teamsById.get(id));
     if (!standings) {
       const note = document.createElement("p");
       note.className = "form-message";
@@ -260,18 +184,17 @@ function createBarrageMatchBox(match, teamsById, x, y, slot) {
   box.style.top = `${y}px`;
   box.style.width = `${QB_BOX_WIDTH}px`;
 
-  const placeholders = QUALIF_BARRAGE_PLACEHOLDERS[slot] || [];
   const team1 = match ? teamsById.get(match.team1_id) : null;
   const team2 = match ? teamsById.get(match.team2_id) : null;
 
   const team1Div = document.createElement("div");
   team1Div.className = "bracket-team";
-  team1Div.textContent = team1 ? matchTeamLabel(team1) : placeholders[0] || "À déterminer";
+  team1Div.textContent = team1 ? formatTeamShort(team1) : qualifPlaceholder(slot, 0);
   box.appendChild(team1Div);
 
   const team2Div = document.createElement("div");
   team2Div.className = "bracket-team";
-  team2Div.textContent = team2 ? matchTeamLabel(team2) : placeholders[1] || "À déterminer";
+  team2Div.textContent = team2 ? formatTeamShort(team2) : qualifPlaceholder(slot, 1);
   box.appendChild(team2Div);
 
   const sets = (match && match.sets) || [];
@@ -370,7 +293,7 @@ function renderQualified(teamsById, barrage2Matches) {
   const qualifiedTeams = slots
     .map((slot) => bySlot.get(slot))
     .filter(Boolean)
-    .map((match) => matchWinnerLoser(match))
+    .map((match) => matchResult(match))
     .filter(Boolean)
     .map((result) => teamsById.get(result.winnerId))
     .filter(Boolean);
@@ -412,16 +335,10 @@ function renderQualified(teamsById, barrage2Matches) {
 }
 
 async function loadQualifs() {
-  const { data: teams, error: teamsError } = await supabaseClient
-    .from("teams")
-    .select("*")
-    .eq("category", currentCategory);
-
-  const { data: matches, error: matchesError } = await supabaseClient
-    .from("matches")
-    .select("*, sets(*)")
-    .eq("category", currentCategory)
-    .in("phase", ["qualif_poule", "qualif_barrage1", "qualif_barrage2"]);
+  const [{ data: teams, error: teamsError }, { data: matches, error: matchesError }] = await Promise.all([
+    supabaseClient.from("teams").select("*").eq("category", currentCategory),
+    supabaseClient.from("matches").select("*, sets(*)").eq("category", currentCategory).in("phase", PHASES_QUALIF),
+  ]);
 
   if (teamsError || matchesError) {
     poolsList.textContent = "Erreur de chargement des qualifications.";

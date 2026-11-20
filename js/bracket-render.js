@@ -1,8 +1,8 @@
 // Rendu du tableau à élimination directe (barrages -> quarts -> demies -> finale +
-// petite finale), partagé entre la page publique "Phases finales" (données en direct
-// depuis Supabase) et la page "Palmarès" (données figées d'un tournoi archivé). Les
-// deux appellants fournissent juste `teams`/`matches` en mémoire ; ce fichier n'a
-// aucune dépendance à Supabase.
+// petite finale), partagé entre la page publique "Main Draw" (onglet Phases Finales,
+// données en direct depuis Supabase) et la page "Palmarès" (données figées d'un
+// tournoi archivé). Les deux appelants fournissent juste `teams`/`matches` en
+// mémoire. Les croisements viennent de js/tournoi-commun.js.
 
 const BRACKET_BOX_WIDTH = 220;
 const BRACKET_BOX_HEIGHT = 67;
@@ -25,37 +25,9 @@ const BRACKET_TREE_HEIGHT = Math.max(
   BRACKET_BASE_HEIGHT / 2 + BRACKET_BOX_HEIGHT / 2 + BRACKET_PETITE_FINALE_GAP + BRACKET_BOX_HEIGHT
 );
 
-// Croisements fixés par le format du tournoi (indépendants des résultats de poule,
-// donc connus dès le départ) — sert de texte de remplacement tant que l'équipe
-// réelle n'est pas encore connue (poules pas finies, ou tour précédent pas joué).
-const BRACKET_SLOT_PLACEHOLDERS = {
-  "barrage-1": ["2e Poule C", "3e Poule B"],
-  "barrage-2": ["2e Poule B", "3e Poule C"],
-  "barrage-3": ["2e Poule D", "3e Poule A"],
-  "barrage-4": ["2e Poule A", "3e Poule D"],
-  "qf-1": ["1er Poule A", "TBD"],
-  "qf-2": ["1er Poule D", "TBD"],
-  "qf-3": ["1er Poule B", "TBD"],
-  "qf-4": ["1er Poule C", "TBD"],
-  "sf-1": ["TBD", "TBD"],
-  "sf-2": ["TBD", "TBD"],
-  "finale": ["TBD", "TBD"],
-  "petite-finale": ["TBD", "TBD"],
-};
-
 function bracketTeamLabel(teamId, teamsById) {
   if (!teamId) return "À déterminer";
-  const team = teamsById.get(teamId);
-  if (!team) return "?";
-  return `${team.player1_prenom} ${team.player1_nom.charAt(0)}. / ${team.player2_prenom} ${team.player2_nom.charAt(0)}.`;
-}
-
-function bracketFormatSetsScore(sets) {
-  return sets
-    .slice()
-    .sort((a, b) => a.set_number - b.set_number)
-    .map((set) => `${set.score_team1}-${set.score_team2}`)
-    .join(" / ");
+  return formatTeamShort(teamsById.get(teamId));
 }
 
 // Centre vertical (en px) de l'élément k (0-indexé) dans une colonne où les
@@ -89,11 +61,14 @@ function bracketComputeCenters() {
   return centers;
 }
 
+// Tant que l'équipe réelle n'est pas connue : le croisement fixé par le format si la
+// place vient d'un classement de poule ("2e Poule C"), sinon juste "TBD" (afficher
+// "Vainqueur Quart 1" partout surchargerait le dessin pour une évidence).
 function bracketSlotTeamLabel(match, teamsById, slot, index) {
   const teamId = match ? (index === 0 ? match.team1_id : match.team2_id) : null;
   if (teamId) return bracketTeamLabel(teamId, teamsById);
-  const placeholder = BRACKET_SLOT_PLACEHOLDERS[slot];
-  return placeholder ? placeholder[index] : "À déterminer";
+  const entrant = (MAINDRAW_BRACKET_ENTRANTS[slot] || [])[index];
+  return entrant ? entrantLabel(entrant) : "TBD";
 }
 
 function createBracketMatchBox(match, teamsById, x, y, slot) {
@@ -117,7 +92,7 @@ function createBracketMatchBox(match, teamsById, x, y, slot) {
   const scoreLine = document.createElement("div");
   if (sets.length > 0) {
     scoreLine.className = "bracket-score";
-    scoreLine.textContent = bracketFormatSetsScore(sets);
+    scoreLine.textContent = formatSetsScore(sets);
   } else {
     scoreLine.className = "badge bracket-score";
     scoreLine.textContent = "?";
@@ -127,20 +102,9 @@ function createBracketMatchBox(match, teamsById, x, y, slot) {
   return box;
 }
 
-// Vainqueur/perdant d'un match d'après ses sets (il faut 2 sets gagnés, comme
-// partout ailleurs pour les matchs à élimination). Retourne null si pas encore décidé.
-function bracketMatchResult(match) {
-  const sets = (match && match.sets) || [];
-  const wins1 = sets.filter((s) => s.score_team1 > s.score_team2).length;
-  const wins2 = sets.filter((s) => s.score_team2 > s.score_team1).length;
-  if (wins1 >= 2) return { winnerId: match.team1_id, loserId: match.team2_id };
-  if (wins2 >= 2) return { winnerId: match.team2_id, loserId: match.team1_id };
-  return null;
-}
-
 function renderBracketPodium(container, matchBySlot, teamsById) {
-  const finaleResult = bracketMatchResult(matchBySlot.get("finale"));
-  const petiteFinaleResult = bracketMatchResult(matchBySlot.get("petite-finale"));
+  const finaleResult = matchResult(matchBySlot.get("finale"));
+  const petiteFinaleResult = matchResult(matchBySlot.get("petite-finale"));
 
   const first = finaleResult ? bracketTeamLabel(finaleResult.winnerId, teamsById) : "?";
   const second = finaleResult ? bracketTeamLabel(finaleResult.loserId, teamsById) : "?";

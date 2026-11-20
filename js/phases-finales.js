@@ -16,16 +16,14 @@ bracketCategoryButtons.forEach((button) => {
 });
 
 async function loadBracket() {
-  const { data: teams, error: teamsError } = await supabaseClient
-    .from("teams")
-    .select("*")
-    .eq("category", currentBracketCategory);
-
-  const { data: matches, error: matchesError } = await supabaseClient
-    .from("matches")
-    .select("*, sets(*)")
-    .eq("category", currentBracketCategory)
-    .in("phase", ["barrage", "quart", "demi", "petite_finale", "finale"]);
+  const [{ data: teams, error: teamsError }, { data: matches, error: matchesError }] = await Promise.all([
+    supabaseClient.from("teams").select("*").eq("category", currentBracketCategory),
+    supabaseClient
+      .from("matches")
+      .select("*, sets(*)")
+      .eq("category", currentBracketCategory)
+      .in("phase", PHASES_MAINDRAW_BRACKET),
+  ]);
 
   if (teamsError || matchesError) {
     bracketContainer.textContent = "Erreur de chargement du tableau.";

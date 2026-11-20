@@ -5,8 +5,7 @@ const navList = document.querySelector(".site-header nav ul");
 // du tournoi comporte des qualifications. Indépendant de l'état de connexion,
 // donc hors du bloc onAuthStateChange ci-dessous.
 (async () => {
-  const { data } = await supabaseClient.from("tournament_formats").select("format").maybeSingle();
-  if (!data || data.format !== "12-quali16") return;
+  if ((await fetchTournamentFormat()) !== "12-quali16") return;
 
   const isCurrentPage = window.location.pathname.endsWith("qualifs.html");
   const item = document.createElement("li");
@@ -16,11 +15,19 @@ const navList = document.querySelector(".site-header nav ul");
   navList.insertBefore(item, navList.children[1] || null);
 })();
 
-supabaseClient.auth.onAuthStateChange(async (_event, session) => {
-  const existingLink = document.getElementById("nav-admin-link");
-  if (existingLink) {
-    existingLink.closest("li").remove();
-  }
+// Supabase peut déclencher plusieurs événements d'affilée (session initiale, jeton
+// rafraîchi...). Le lien est donc retiré/remis APRÈS la lecture du rôle, et seul le
+// dernier événement en date l'affiche : sinon deux lectures en parallèle ajoutaient
+// chacune leur lien, et le menu apparaissait en double.
+let navAuthVersion = 0;
+
+supabaseClient.auth.onAuthStateChange((_event, session) => {
+  // Différé : Supabase déconseille d'appeler ses fonctions directement dans ce callback.
+  setTimeout(() => renderNavAuth(session), 0);
+});
+
+async function renderNavAuth(session) {
+  const version = ++navAuthVersion;
 
   // Un compte connecté mais sans rôle (admin/scorer) ne doit pas voir "Gestion du
   // tournoi" — il n'a accès à rien là-bas, donc pour lui le menu reste comme un visiteur.
@@ -32,6 +39,12 @@ supabaseClient.auth.onAuthStateChange(async (_event, session) => {
       .eq("user_id", session.user.id)
       .maybeSingle();
     hasAccess = Boolean(profile && (profile.role === "admin" || profile.role === "scorer"));
+  }
+  if (version !== navAuthVersion) return;
+
+  const existingLink = document.getElementById("nav-admin-link");
+  if (existingLink) {
+    existingLink.closest("li").remove();
   }
 
   const item = document.createElement("li");
@@ -47,4 +60,4 @@ supabaseClient.auth.onAuthStateChange(async (_event, session) => {
     : '<a href="admin.html" id="nav-admin-link">Connexion</a>';
 
   navList.appendChild(item);
-});
+}

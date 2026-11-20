@@ -17,28 +17,6 @@ categoryButtons.forEach((button) => {
   });
 });
 
-function teamPoints(team) {
-  return Number(team.points || 0);
-}
-
-function formatTeamDetail(team) {
-  return `${team.player1_prenom} ${team.player1_nom} / ${team.player2_prenom} ${team.player2_nom}`;
-}
-
-// Même logique que côté admin (js/gestion.js) et les autres pages publiques : tant
-// qu'aucun classement manuel n'a été fait (teams.seed tous null), l'ordre par défaut
-// vient des points de la paire (décroissant).
-function defaultSeedOrder(teams) {
-  const hasManualSeed = teams.some((team) => team.seed != null);
-  if (hasManualSeed) return teams;
-
-  return teams.slice().sort((a, b) => {
-    const diff = teamPoints(b) - teamPoints(a);
-    if (diff !== 0) return diff;
-    return new Date(a.created_at) - new Date(b.created_at);
-  });
-}
-
 function renderTeamRow(rank, team) {
   const row = document.createElement("div");
   row.className = "match-row";
@@ -78,15 +56,16 @@ function renderSection(title, teams, startRank) {
 async function loadEquipes() {
   content.innerHTML = "Chargement…";
 
-  const { data: formatData } = await supabaseClient.from("tournament_formats").select("format").maybeSingle();
-  const isQuali16 = Boolean(formatData && formatData.format === "12-quali16");
-
-  const { data: teams, error } = await supabaseClient
-    .from("teams")
-    .select("*")
-    .eq("category", currentCategory)
-    .order("seed", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: true });
+  const [format, { data: teams, error }] = await Promise.all([
+    fetchTournamentFormat(),
+    supabaseClient
+      .from("teams")
+      .select("*")
+      .eq("category", currentCategory)
+      .order("seed", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true }),
+  ]);
+  const isQuali16 = format === "12-quali16";
 
   if (error) {
     content.textContent = "Erreur de chargement des équipes.";

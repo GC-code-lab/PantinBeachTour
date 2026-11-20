@@ -36,14 +36,20 @@ Pas de jargon inutile, juste les 3 briques à connaître :
 
 ### Partie publique (pas besoin de compte)
 
+Ordre des liens dans le bandeau du haut : **Équipes · Qualifs** *(si formule avec qualifs)* **· Main Draw · Ordre des matchs · Suivi d'équipe · Palmarès**, puis **Connexion** (ou l'icône ⚙ une fois connecté avec un rôle). Le logo "🏐 Sand System Tournament" ramène à la page d'accueil (Main Draw).
+
 | Page | Fichier | Ce qu'on y voit |
 |---|---|---|
-| **Qualifs** | `qualifs.html` | *Visible uniquement si la formule active du tournoi comporte des qualifications (voir section 4bis)* — deux sous-onglets **Poules** et **Barrages** : les 4 poules de qualification ("Poule Qualif A" à "D") avec leurs scores, et un tableau visuel type bracket pour les 8 barrages de qualification. Apparaît dans le bandeau du haut, avant "Main Draw". |
-| **Main Draw** (page d'accueil) | `index.html` | Deux sous-onglets : **Poule** (les 4 poules A/B/C/D du tournoi principal par catégorie, les équipes de chaque poule, et les matchs/scores de poule, repliés par défaut) et **Phases Finales** (le tableau à élimination directe en dessin : barrages → quarts → demies → finale + petite finale, avec un podium en dessous une fois le tournoi terminé) — toujours le tableau du tournoi principal, identique quelle que soit la formule choisie |
-| **Ordre des matchs** | `ordre-des-matchs.html` | L'ordre de passage des matchs **terrain par terrain** (voir section 9) — pratique à afficher/imprimer le jour J pour savoir qui joue où et dans quel ordre. Pour la formule "12 équipes, qualifs 16", deux onglets apparaissent en haut : **Qualif (Samedi)** et **Main-draw (Dimanche)**. |
+| **Équipes** | `equipes.html` | La liste des équipes inscrites dans la catégorie, avec leur **numéro de tête de série** (#1, #2...) et leurs **points**. Pour la formule "12 équipes, qualifs 16", la liste est coupée en deux : **Direct Maindraw** (les 8 premières têtes de série) et **Qualifications** (les 16 suivantes) — même répartition que côté admin. |
+| **Qualifs** | `qualifs.html` | *Visible uniquement si la formule active du tournoi comporte des qualifications (voir section 4bis)* — deux sous-onglets **Poules** et **Barrages** : les 4 poules de qualification ("Poule Qualif A" à "D") avec leurs matchs/scores et leur classement 1-2-3-4, et un tableau visuel type bracket pour les 8 barrages de qualification. En bas de page, un bloc **"Les qualifiés pour le Main Draw"** affiche une carte ✅ par équipe qualifiée, au fur et à mesure que les Barrages 5 à 8 sont joués. Apparaît dans le bandeau juste après "Équipes". |
+| **Main Draw** (page d'accueil) | `index.html` | Deux sous-onglets : **Poule** (les 4 poules A/B/C/D du tournoi principal, avec pour chacune la liste des équipes, puis deux blocs repliés par défaut : **"Matchs et résultats"** et **"Classement"** — rang, victoires, défaites, ratio de points, tête de série) et **Phases Finales** (le tableau à élimination directe en dessin : barrages → quarts → demies → finale + petite finale, avec un podium en dessous une fois le tournoi terminé) — toujours le tableau du tournoi principal, identique quelle que soit la formule choisie. *(Avant le 09/10/2026, Poules et Phases finales étaient deux pages séparées.)* |
+| **Ordre des matchs** | `ordre-des-matchs.html` | L'ordre de passage des matchs **terrain par terrain**, avec l'horaire prévu (voir section 9) — pratique à afficher/imprimer le jour J pour savoir qui joue où et dans quel ordre. Pour la formule "12 équipes, qualifs 16", deux onglets apparaissent en haut : **Qualif (Samedi)** et **Main-draw (Dimanche)**. |
+| **Suivi d'équipe** | `suivi.html` | Un champ de recherche : on tape un nom ou prénom de joueur (2 lettres minimum, accents ignorés), on choisit sa paire dans la liste, et la page affiche **tous ses matchs dans l'ordre chronologique** (samedi avant dimanche) : horaire, terrain, adversaire, score, et un badge **Gagné / Perdu / À venir**. Chaque match est un lien qui ouvre "Ordre des matchs" directement sur la bonne ligne (dépliée et surlignée). Si l'adversaire n'est pas encore connu, la page dit d'où il viendra (ex : "vs vainqueur de Barrage 2"), et ce texte est lui aussi cliquable. Seuls les matchs qui existent déjà en base apparaissent (pas de projection des tours suivants). |
 | **Palmarès** | `palmares.html` | La liste des tournois passés, chacun dépliable pour revoir son tableau des phases finales avec tous les scores (voir section 5) |
 
-Les pages **Main Draw** et **Qualifs** ont un sélecteur **Hommes / Femmes** en haut, pour basculer entre les deux catégories — ce sélecteur est partagé par leurs sous-onglets respectifs. La page **Ordre des matchs** n'a pas ce sélecteur : elle affiche les 4 terrains d'un coup, chacun dédié à une seule catégorie (voir section 9). La page **Palmarès** a un sélecteur Hommes/Femmes **par tournoi déplié** (pas un seul sélecteur global en haut de page), puisqu'elle peut afficher plusieurs tournois à la fois.
+Les pages **Équipes**, **Main Draw** et **Qualifs** ont un sélecteur **Hommes / Femmes** en haut, pour basculer entre les deux catégories — ce sélecteur est partagé par leurs sous-onglets respectifs. La page **Ordre des matchs** n'a pas ce sélecteur : elle affiche les 4 terrains d'un coup, chacun dédié à une seule catégorie (voir section 9). **Suivi d'équipe** non plus : la catégorie découle de l'équipe choisie. La page **Palmarès** a un sélecteur Hommes/Femmes **par tournoi déplié** (pas un seul sélecteur global en haut de page), puisqu'elle peut afficher plusieurs tournois à la fois.
+
+⚠️ Les pages publiques **ne se rafraîchissent pas toutes seules** : pour voir un score qui vient d'être saisi, il faut recharger la page.
 
 **Avant même que les poules soient terminées**, le tableau des phases finales affiche déjà les croisements connus à l'avance (ex: "2e Poule C" contre "3e Poule B" pour un barrage, "1er Poule A" pour un quart) — ces croisements sont fixés par le format du tournoi, indépendamment des résultats. Le reste (ex: "vainqueur du quart 1") s'affiche juste comme "TBD" tant que ce n'est pas joué, pour ne pas surcharger l'affichage avec une évidence. La page **Qualifs** fait pareil pour ses propres barrages, mais avec un libellé plus parlant : "Vainqueur du Barrage 2" plutôt qu'un "TBD" générique, pour que les joueurs sachent quel match suivre (voir section 4bis).
 
@@ -56,13 +62,13 @@ Le site est pensé pour être consulté sur téléphone. Seule exception : le ta
 | **Connexion** | `admin.html` | Se connecter, ou créer un nouveau compte (voir section 6) |
 | **Gestion du tournoi** | `gestion.html` | Tout le pilotage du tournoi (voir section 4 et 4bis) |
 
-**Comment y accéder** : sur toutes les pages, une fois connecté avec un rôle (admin ou scorer), le lien texte "Gestion du tournoi" du bandeau du haut est remplacé par une icône **⚙**, tout en haut à droite à côté de "Palmarès". Passer la souris dessus déroule un petit menu avec deux destinations : **"Gestion du tournoi"** (ouvre `gestion.html`, sur la vue par défaut) et **"Connexion"** (ouvre `gestion.html#compte`, directement sur le compte/les rôles). Le menu se referme tout seul dès que la souris s'en va — pas besoin de cliquer ailleurs. Un visiteur non connecté (ou un compte sans rôle) voit juste "Connexion" en texte, comme avant, qui mène vers `admin.html`.
+**Comment y accéder** : sur toutes les pages, une fois connecté avec un rôle (admin ou scorer), le lien texte "Gestion du tournoi" du bandeau du haut est remplacé par une icône **⚙**, tout en haut à droite à côté de "Palmarès". Passer la souris dessus déroule un petit menu avec trois destinations : **"Gestion du tournoi"** (ouvre `gestion.html`, sur la vue par défaut), **"Amélioration du site"** (ouvre `gestion.html#feedback`, la boîte à idées — voir section 13) et **"Connexion"** (ouvre `gestion.html#compte`, directement sur le compte/les rôles). Ces trois vues sont trois "sections" de la même page `gestion.html`, choisies d'après la fin de l'adresse (`#feedback`, `#compte`, ou rien). Le menu se referme tout seul dès que la souris s'en va — pas besoin de cliquer ailleurs. Un visiteur non connecté (ou un compte sans rôle) voit juste "Connexion" en texte, comme avant, qui mène vers `admin.html`.
 
 ---
 
 ## 4. Les onglets de "Gestion du tournoi"
 
-Une fois sur `gestion.html` (via l'icône ⚙ → "Gestion du tournoi"), 4 onglets apparaissent **seulement si une formule a déjà été choisie pour le tournoi** (voir section 4bis — tant que ce n'est pas fait, cette vue n'a rien à montrer) :
+Une fois sur `gestion.html` (via l'icône ⚙ → "Gestion du tournoi"), il y a 4 onglets. **"Formule"** est toujours visible pour un admin ; les 3 autres n'apparaissent **qu'une fois une formule choisie** pour le tournoi (voir section 4bis). Un scorer ne voit que "Matchs & Résultats" (voir section 6). Chaque onglet (sauf Formule) a son propre sélecteur Hommes/Femmes, partagé entre eux :
 
 ### Onglet "Formule"
 Voir section 4bis — c'est le premier onglet, et le passage obligé avant tout le reste.
@@ -90,7 +96,12 @@ Le formulaire pour inscrire une équipe : Nom/Prénom des deux joueurs (Nom mis 
 
 **Important** : dès qu'un score fait gagner un match à élimination (barrage/quart/demi, ou un barrage/poule de qualif), l'équipe gagnante (et pour les demies, la perdante aussi) est **automatiquement placée** dans le match suivant — pas besoin de le faire à la main.
 
-**Corriger ou effacer un score** : vider tous les champs de score d'un match déjà noté, puis cliquer "Enregistrer", **supprime** ce score (au lieu de bloquer avec une erreur) et remet le match "à venir". Si ce match avait déjà fait avancer une équipe au tour suivant, ça défait aussi cette avancée automatiquement — sauf si ce tour suivant a lui-même déjà été joué avec cette équipe, auquel cas le site bloque et affiche un message : il faut d'abord effacer le score de ce match suivant, puis remonter le tableau pas à pas.
+**Corriger ou effacer un score** :
+- **Corriger** : retaper le score et "Enregistrer". Si le vainqueur change, l'équipe placée au tour suivant est remplacée automatiquement. Si le match n'est plus tranché (ex : on ne garde qu'un set), il repasse "à venir" et sa place au tour suivant est vidée. Un tie-break devenu inutile (correction d'un 1-1 en 2-0) est supprimé.
+- **Effacer** : vider tous les champs du match puis "Enregistrer" **supprime** le score et remet le match "à venir", en défaisant l'avancée au tour suivant.
+- Dans les deux cas, si le tour suivant a **déjà été joué** avec l'équipe concernée, le site bloque et affiche un message : il faut d'abord effacer le score de ce match suivant, puis remonter le tableau pas à pas.
+
+**Places pas encore connues** : tant qu'une équipe n'est pas connue, la ligne de match indique d'où elle viendra ("2e Poule C", "Vainqueur Barrage 2", "Perdant Demi 1"...).
 
 ---
 
@@ -137,7 +148,7 @@ Cette formule ajoute une phase de qualification avant le tournoi principal (le "
 
 Les scores des qualifications se saisissent uniquement depuis l'admin (par un admin ou un scorer, comme les autres scores). Ils sont consultables publiquement sur la page **Qualifs** (voir section 3), qui n'apparaît dans le bandeau que si cette formule est active.
 
-**Aperçu des poules du Maindraw avant même le début des qualifications** : la page publique "Poules" (section 3) affiche un aperçu dès que 24 équipes sont inscrites, sans attendre que les qualifications soient jouées ni même générées. Les équipes "direct Maindraw" dont les points dépassent la meilleure équipe de qualif sont certaines de leur rang final (aucune qualifiée ne pourra jamais les dépasser au classement final) et apparaissent donc déjà dans leur poule A/B/C/D. Les 4 slots qualifiés affichent "TBD". Une équipe "direct Maindraw" placée par wild card (points inférieurs ou égaux à une équipe de qualif) a un rang final incertain — elle n'est pas placée dans une poule, mais listée à part ("En attente de confirmation de poule") jusqu'à la fin des qualifications.
+**Aperçu des poules du Maindraw avant même le début des qualifications** : la page publique Main Draw, sous-onglet "Poule" (section 3), affiche un aperçu dès que 24 équipes sont inscrites, sans attendre que les qualifications soient jouées ni même générées. Les équipes "direct Maindraw" dont les points dépassent la meilleure équipe de qualif sont certaines de leur rang final (aucune qualifiée ne pourra jamais les dépasser au classement final) et apparaissent donc déjà dans leur poule A/B/C/D. Les 4 slots qualifiés affichent "TBD". Une équipe "direct Maindraw" placée par wild card (points inférieurs ou égaux à une équipe de qualif) a un rang final incertain — elle n'est pas placée dans une poule, mais listée à part ("En attente de confirmation de poule") jusqu'à la fin des qualifications.
 
 ---
 
@@ -163,9 +174,9 @@ Sur la page publique Palmarès, quand tu es connecté avec ton compte principal 
 
 Il y a 3 niveaux :
 
-1. **Visiteur** (personne connectée sans rôle, ou pas connectée du tout) : peut seulement **regarder** les pages publiques (Qualifs, Poules, Phases finales, Ordre des matchs, Palmarès). Ne peut rien modifier. Un compte créé mais sans rôle voit exactement la même chose qu'un simple visiteur (juste l'onglet "Connexion" en plus, avec son email et un bouton pour se déconnecter — accessible via l'icône ⚙).
-2. **Scorer** : en plus, peut **saisir les scores** des matchs (onglet "Matchs & Résultats" uniquement — y compris les scores de qualification). Ne voit pas les onglets "Formule", "Inscription" ni "Têtes de série & Poules".
-3. **Admin** : accès à tout — formule, inscriptions, poules, scores, et peut gérer les rôles des autres comptes.
+1. **Visiteur** (personne connectée sans rôle, ou pas connectée du tout) : peut seulement **regarder** les pages publiques (Équipes, Qualifs, Main Draw, Ordre des matchs, Suivi d'équipe, Palmarès). Ne peut rien modifier. Un compte créé mais sans rôle voit exactement la même chose qu'un simple visiteur (juste l'onglet "Connexion" en plus, avec son email et un bouton pour se déconnecter — accessible via l'icône ⚙).
+2. **Scorer** : en plus, peut **saisir les scores** des matchs (onglet "Matchs & Résultats" uniquement — y compris les scores de qualification). Ne voit pas les onglets "Formule", "Inscription" ni "Têtes de série & Poules". Peut écrire dans la boîte à idées "Amélioration du site", mais pas relire les messages.
+3. **Admin** : accès à tout — formule, inscriptions, poules, scores, sauvegarde dans le Palmarès, lecture/suppression des messages de la boîte à idées, et gestion des rôles des autres comptes.
 
 Dans tous les cas, les onglets "Inscription", "Têtes de série & Poules" et "Matchs & Résultats" restent cachés tant qu'aucune formule n'a été choisie pour le tournoi (voir section 4bis) — même pour un admin.
 
@@ -210,14 +221,17 @@ Ce n'est pas juste une question d'affichage : la base de données elle-même vé
 
 Si tu vas dans Supabase → Table Editor, tu verras ces tables :
 
-- **`teams`** : les équipes inscrites (noms des joueurs, points de classement de la paire, catégorie, poule assignée, classement tête de série)
+- **`teams`** : les équipes inscrites (`name` = "NOM1/NOM2", `player1_nom`/`player1_prenom`/`player2_nom`/`player2_prenom`, `points` de la paire, `category`, `pool_id` = poule du Maindraw assignée, `seed` = classement tête de série manuel, vide tant qu'aucun ajustement n'a été fait)
 - **`pools`** : les 4 poules (A/B/C/D) par catégorie, **du tournoi principal (Maindraw) uniquement** — les poules de qualification (formule "12 équipes, qualifs 16") ne sont pas des lignes de cette table ; elles n'existent que sous forme de matchs (voir ci-dessous), regroupés par lettre dans leur `slot`
-- **`matches`** : tous les matchs — de poule, barrages, quarts, demies, petite finale, finale (une colonne `phase` dit lequel, une colonne `category` dit Hommes ou Femmes). Pour la formule "12 équipes, qualifs 16", trois valeurs de `phase` supplémentaires existent : `qualif_poule` (poules brésiliennes), `qualif_barrage1` et `qualif_barrage2` (les 2 tours de barrages de qualif) — leur `slot` encode la poule/le numéro de barrage (ex: `qA-r1-1`, `qb5`)
+- **`matches`** : tous les matchs — de poule, barrages, quarts, demies, petite finale, finale (une colonne `phase` dit lequel, une colonne `category` dit Hommes ou Femmes). Pour la formule "12 équipes, qualifs 16", trois valeurs de `phase` supplémentaires existent : `qualif_poule` (poules brésiliennes), `qualif_barrage1` et `qualif_barrage2` (les 2 tours de barrages de qualif) — leur `slot` encode la poule/le numéro de barrage (ex: `qA-r1-1`, `qb5`). Les matchs du tableau final ont aussi un `slot` fixe (`barrage-1`…`barrage-4`, `qf-1`…`qf-4`, `sf-1`, `sf-2`, `petite-finale`, `finale`) ; les matchs de poule n'en ont pas (ils sont rattachés à leur poule par `pool_id`, et leur ordre de jeu = leur ordre de création). Une colonne `status` vaut `a_venir` ou `termine`. ⚠️ Un même `slot` existe une fois **par catégorie** : toute requête par slot doit aussi filtrer sur `category`
 - **`sets`** : les scores de chaque set joué, liés à un match. Une contrainte d'unicité sur (`match_id`, `set_number`) empêche qu'un même set soit enregistré deux fois par erreur (ex: double-clic sur "Enregistrer")
 - **`profiles`** : qui a quel rôle (admin/scorer) — lié aux comptes de connexion
 - **`signup_codes`** : les deux codes d'inscription automatique (admin/scorer), modifiables depuis l'onglet Connexion
 - **`tournament_archives`** : les tournois sauvegardés dans le Palmarès (nom, mois, année, et une colonne `data` qui contient une copie complète et figée des équipes + du tableau des phases finales des deux catégories, au format JSON) — voir section 5
 - **`tournament_formats`** : une seule ligne (`id = 1`), avec la formule active du tournoi en cours (`"12"`, `"16"`, ou `"12-quali16"`) — voir section 4bis. Lisible par tout le monde (public), modifiable uniquement par un admin.
+- **`site_feedback`** : les messages de la boîte à idées "Amélioration du site" (`message`, `author_email`, date). Un admin ou un scorer peut en ajouter ; seuls les admins peuvent les lire et les supprimer (règles RLS côté Supabase).
+
+Fonctions SQL (RPC) appelées par le site : `list_all_accounts`, `assign_role`, `remove_role`, `delete_account`, `claim_role_with_code` (code d'inscription), `delete_tournament_archive`. Plus le déclencheur `auto_confirm_email_trigger` (voir section 12). Le code SQL lui-même n'est **pas** dans le dépôt GitHub : il n'existe que dans Supabase.
 
 ---
 
@@ -246,6 +260,8 @@ La page publique **Ordre des matchs** (`ordre-des-matchs.html`, fichier `js/ordr
 
 ### Répartition des terrains par catégorie
 
+Chaque terrain affiche son **Programme** (bloc repliable) : matchs de poule puis phases finales, dans l'ordre horaire.
+
 Il y a 4 terrains, dédiés en dur à une catégorie chacun :
 
 | Terrain | Catégorie |
@@ -255,7 +271,7 @@ Il y a 4 terrains, dédiés en dur à une catégorie chacun :
 | 3 | Hommes |
 | 4 | Femmes |
 
-Chaque catégorie utilise donc 2 terrains en parallèle, indépendamment de l'autre catégorie — mais suit le **même planning horaire** qu'elle (définis une fois dans `MAINDRAW_SCHEDULE`/`QUALIF_SCHEDULE` de `js/ordre-des-matchs.js`, appliqués identiquement aux deux catégories sur leurs propres terrains).
+Chaque catégorie utilise donc 2 terrains en parallèle, indépendamment de l'autre catégorie — mais suit le **même planning horaire** qu'elle (définis une seule fois dans `MAINDRAW_SCHEDULE`/`QUALIF_SCHEDULE` de `js/tournoi-commun.js`, appliqués identiquement aux deux catégories sur leurs propres terrains, et réutilisés par "Suivi d'équipe").
 
 ### Dimanche — Main-draw (poules de 3)
 
@@ -275,6 +291,8 @@ Avec des poules de 3 équipes, un même pool n'a jamais 2 matchs simultanés **e
 | 14h15 | Quart 3 (1er Poule B) | Quart 4 (1er Poule C) |
 | 15h15 | Demi 1 | Demi 2 |
 | 16h15 | Finale | Petite finale |
+
+⚠️ Ce planning est pensé pour des **poules de 3** (formules "12 équipes" et "12 équipes, qualifs 16" : 3 tours par poule). En formule **"16 équipes"** (poules de 4, 6 matchs par poule), seuls les 3 premiers matchs de chaque poule apparaissent dans "Ordre des matchs" et "Suivi d'équipe" — il faudrait un planning dédié si cette formule est utilisée.
 
 Les Poules B et C tournent ensemble (chaque terrain de la catégorie alterne entre les deux), les Poules A et D tournent ensemble en décalé d'une demi-heure. Barrage 1+2 et Quart 1+2 vont ensemble (ils alimentent la Demi 1, voir section 8) ; Barrage 3+4 et Quart 3+4 vont ensemble (Demi 2). Tant qu'un match n'a pas encore d'équipes connues, la page affiche les croisements prévus par le format (ex: "2e Poule C" / "3e Poule B" pour le Barrage 1) — mêmes libellés que la page publique Phases finales.
 
@@ -298,6 +316,8 @@ Ici, contrairement au Main-draw, une poule de qualif (4 équipes) **a bien** 2 m
 | 17h15 | Barrage qualif 6 (1B vs vainqueur B1) | Barrage qualif 8 (1D vs vainqueur B3) |
 
 Ordre de passage des poules de qualif : **B, D, A, C** (aux deux tours) — différent de l'ordre alphabétique, choix arbitraire pour varier l'enchaînement comme pour le Main-draw. Les barrages de qualif sont groupés par poules concernées : Barrage qualif 2 (2B-3D) et Barrage qualif 4 (2D-3B) ensemble à 15h (tous deux B/D) ; Barrage qualif 1 (2A-3C) et Barrage qualif 3 (2C-3A) ensemble à 15h45 (tous deux A/C) ; puis le 2e tour reprend le même regroupement (B2→B5 et B4→B7 ensemble, B1→B6 et B3→B8 ensemble) — les croisements eux-mêmes (qui affronte qui) restent ceux définis en section 4bis/8, seul le regroupement par terrain/horaire change.
+
+**Lien depuis "Suivi d'équipe"** : chaque ligne de match porte un identifiant invisible (`slot:<catégorie>:<slot>` pour les matchs à slot fixe, `match:<id>` pour les matchs de poule). Une adresse du type `ordre-des-matchs.html?day=maindraw&anchor=slot:Hommes:barrage-2` ouvre le bon onglet, déplie le terrain concerné, fait défiler jusqu'au match et le surligne quelques secondes.
 
 ---
 
@@ -325,7 +345,32 @@ git push
 
 ✅ Le site est **en ligne** depuis GitHub Pages : **https://gc-code-lab.github.io/PantinBeachTour/**. Chaque `git push` sur la branche `main` republie automatiquement le site (compte quelques minutes de battement).
 
-⚠️ **Piège du cache navigateur** : contrairement à `serve.py` en local (qui désactive volontairement le cache), GitHub Pages, lui, laisse les navigateurs mettre les fichiers en cache normalement. Du coup, chaque fichier CSS/JS est chargé avec un numéro de version dans son adresse (ex : `style.css?v=59`, `gestion.js?v=69`) — **à chaque modification d'un de ces fichiers, il faut augmenter ce numéro d'un cran dans le(s) fichier(s) HTML qui le chargent**, sinon les visiteurs continuent de voir l'ancienne version pendant un moment. Si tu demandes une modification à Claude, c'est normalement fait automatiquement à chaque fois — mais si un changement ne semble "pas s'appliquer" en ligne, c'est le premier réflexe à vérifier.
+⚠️ **Piège du cache navigateur** : contrairement à `serve.py` en local (qui désactive volontairement le cache), GitHub Pages, lui, laisse les navigateurs mettre les fichiers en cache normalement. Du coup, chaque fichier CSS/JS est chargé avec un numéro de version dans son adresse (ex : `style.css?v=69`, `gestion.js?v=72`). `style.css` et `nav.js` sont chargés par **toutes** les pages HTML : il faut donc monter leur numéro dans les 8 fichiers HTML d'un coup — **à chaque modification d'un de ces fichiers, il faut augmenter ce numéro d'un cran dans le(s) fichier(s) HTML qui le chargent**, sinon les visiteurs continuent de voir l'ancienne version pendant un moment. Si tu demandes une modification à Claude, c'est normalement fait automatiquement à chaque fois — mais si un changement ne semble "pas s'appliquer" en ligne, c'est le premier réflexe à vérifier.
+
+### Organisation du code
+
+Pas de framework ni d'étape de build : chaque page HTML charge, dans cet ordre :
+1. la librairie Supabase (depuis un CDN, **version fixée** : `supabase-js@2.119.0` — à monter volontairement, pas automatiquement) ;
+2. `js/supabaseClient.js` (adresse + clé publique du projet Supabase) ;
+3. **`js/tournoi-commun.js`** — les règles du tournoi partagées par toutes les pages (voir plus bas) ;
+4. `js/nav.js` (bandeau commun : lien Qualifs, menu ⚙/Connexion) ;
+5. le ou les scripts propres à la page.
+
+| Fichier JS | Utilisé par | Rôle |
+|---|---|---|
+| `tournoi-commun.js` | toutes les pages | **La source de vérité** : croisements du tableau (`MAINDRAW_BRACKET_ENTRANTS`, `QUALIF_BARRAGE_ENTRANTS`), propagation des vainqueurs (`BRACKET_PROGRESSION`), classement de poule (`computePoolStandings`) et de poule brésilienne, vainqueur d'un match (`matchResult`), terrains et plannings (`GENDER_TERRAINS`, `MAINDRAW_SCHEDULE`, `QUALIF_SCHEDULE`), ordre des têtes de série, email du compte Propriétaire, petits outils d'affichage |
+| `gestion.js` | `gestion.html` | Tout l'admin : formule, inscriptions, import JSON, têtes de série, génération des poules/qualifs/tableau, saisie des scores, sauvegarde Palmarès, comptes/rôles, boîte à idées |
+| `login.js` | `admin.html` | Connexion et création de compte (avec code optionnel) |
+| `equipes.js` | `equipes.html` | Page Équipes |
+| `qualifs.js` | `qualifs.html` | Page Qualifs (poules brésiliennes, bracket des barrages, qualifiés) |
+| `poules.js`, `phases-finales.js`, `bracket-render.js`, `maindraw-tabs.js` | `index.html` | Main Draw : poules + classement, tableau final, bascule entre les 2 sous-onglets |
+| `bracket-render.js`, `palmares.js` | `palmares.html` | Le dessin du tableau final est partagé avec le Main Draw |
+| `ordre-des-matchs.js` | `ordre-des-matchs.html` | Plannings par terrain |
+| `suivi.js` | `suivi.html` | Suivi d'équipe |
+
+**Règle d'or** : une règle du tournoi (un croisement, un horaire, un critère de départage...) ne s'écrit qu'**une seule fois**, dans `tournoi-commun.js`. Les autres fichiers ne font que l'utiliser — par exemple, changer un croisement de barrage dans `MAINDRAW_BRACKET_ENTRANTS` change à la fois la génération du tableau côté admin ET tous les libellés "2e Poule C" des pages publiques. Seuls les **libellés** restent propres à chaque page (ex : "TBD" dans le dessin du tableau, "Vainqueur du Barrage 2" sur la page Qualifs).
+
+⚠️ Comme tous les scripts d'une page partagent le même espace de noms, un nom défini dans `tournoi-commun.js` ne doit pas être redéfini (`const`/`let`) dans un autre fichier JS : la page planterait au chargement.
 
 ---
 
@@ -364,6 +409,26 @@ git push
 
 **Intégration des qualifs à "Ordre des matchs", avec horaires fixes** (07/10/2026) : la page affiche désormais 2 onglets ("Qualif (Samedi)" / "Main-draw (Dimanche)") quand la formule active comporte des qualifications, avec un **horaire précis affiché à côté de chaque match** sur les deux journées — jusque-là cette page ignorait les qualifs et n'affichait aucun horaire. Changement d'architecture à cette occasion : l'ancienne logique générique (`POOL_ORDER` + découpage mécanique des matchs d'une poule par paquets de 2) a été remplacée par un **planning explicite** (`MAINDRAW_SCHEDULE`/`QUALIF_SCHEDULE` dans js/ordre-des-matchs.js, un tableau d'horaires avec ce qui se joue sur chaque terrain à chaque heure), donné heure par heure par Gabriel plutôt que déduit automatiquement. Raison du changement : l'ancienne logique supposait à tort qu'un "tour" avait toujours 2 matchs simultanés *au sein d'une même poule* — vrai pour une poule de 4 (et donc pour les poules de qualif), mais **faux pour une poule de 3** (round-robin à 3 équipes, 1 seul match par tour) où elle produisait un mauvais découpage (2 matchs présentés comme simultanés alors qu'ils partagent une équipe). Le vrai planning du Main-draw (poules de 3) fait jouer 2 POULES DIFFÉRENTES en parallèle (Poule B + Poule C ensemble, Poule A + Poule D ensemble, décalées d'une demi-heure) plutôt que de chercher une simultanéité interne impossible. Voir section 9 pour le détail complet des deux plannings.
 
-**Inversion des terrains par catégorie** (08/10/2026) : Hommes et Femmes ont échangé leurs terrains — Hommes joue maintenant sur 2 et 3, Femmes sur 1 et 4 (c'était l'inverse). Un seul endroit à changer : `GENDER_TERRAINS`/`COURTS` dans js/ordre-des-matchs.js, le reste du site ne fait jamais référence à un numéro de terrain précis.
+**Inversion des terrains par catégorie** (08/10/2026) : Hommes et Femmes ont échangé leurs terrains — Hommes joue maintenant sur 2 et 3, Femmes sur 1 et 4 (c'était l'inverse). Un seul endroit à changer : `GENDER_TERRAINS`/`COURTS` (aujourd'hui dans js/tournoi-commun.js), le reste du site ne fait jamais référence à un numéro de terrain précis.
 
 **Correction du départage de poule (différence → ratio de points)** (14/10/2026) : suite à un souci constaté pendant un tournoi, le départage en cas d'égalité de victoires (2 équipes à égalité, ou "triangulaire" à 3) utilisait une **différence** de points (marqués − encaissés), alors que la règle du tournoi est un **ratio** (marqués ÷ encaissés). Corrigé dans `computePoolStandings` (dupliqué dans js/poules.js et js/gestion.js — ce dernier sert à déterminer le 1er/2e/3e de chaque poule pour générer les barrages, donc le bug pouvait réellement mal placer une équipe dans le tableau final). Le ratio est comparé par produit en croix (`bFor * aAgainst` vs `aFor * bAgainst`) plutôt que par division, pour ne jamais tomber sur une division par zéro si une équipe n'a encaissé aucun point. La colonne "Diff" de la page publique Poules est devenue "Ratio" (affiché avec 2 décimales, "∞" si 0 point encaissé).
+
+**Page "Suivi d'équipe"** (08-09/10/2026) : nouvelle page publique pour qu'un joueur retrouve tous ses matchs sans fouiller les poules et le tableau : recherche par nom, liste chronologique sur les 2 jours avec horaire/terrain/score/badge Gagné-Perdu, et liens directs vers la ligne correspondante dans "Ordre des matchs" (voir sections 3 et 9). À l'époque, les plannings et la table de progression du tableau y avaient été **recopiés** depuis `ordre-des-matchs.js`/`gestion.js` (regroupés depuis dans `tournoi-commun.js`, voir plus bas). Correctif associé : les liens incluent la catégorie, car un slot comme `barrage-2` existe chez les Hommes ET chez les Femmes.
+
+**Page publique "Équipes"** (09/10/2026) : liste des équipes inscrites avec tête de série et points, scindée Direct Maindraw / Qualifications en formule "12 équipes, qualifs 16". Devient le premier lien du bandeau.
+
+**Barrages de qualif en bracket visuel + aperçu du Maindraw** (09/10/2026) : la page Qualifs passe en sous-onglets Poules/Barrages, les barrages de qualif sont dessinés comme le tableau final (2 colonnes de 4 matchs reliés 1 pour 1), et le Main Draw affiche un aperçu des poules avant même la fin des qualifs (voir fin de section 4bis).
+
+**Fusion Poules + Phases finales dans "Main Draw"** (09/10/2026) : les deux pages publiques séparées (`index.html` pour les poules, `phases-finales.html`) sont devenues une seule page "Main Draw" à deux sous-onglets, pour alléger le bandeau. `phases-finales.html` n'existe plus.
+
+**Mise à jour du guide** (20/11/2026) : relecture complète du code et remise à niveau de ce fichier — ajout des pages Équipes et Suivi d'équipe, du menu ⚙ à 3 entrées, de la table `site_feedback`, de l'organisation du code (section 11), et de la limite du planning en formule "16 équipes" (section 9).
+
+**Grand nettoyage + corrections de bugs** (20/11/2026) :
+- *Code commun* : les règles du tournoi qui existaient en 2 à 5 exemplaires (croisements, propagation, classement de poule, plannings, terrains, ordre des têtes de série...) sont regroupées dans un seul fichier, `js/tournoi-commun.js` (voir section 11). Les croisements sont décrits une seule fois (`MAINDRAW_BRACKET_ENTRANTS`, `QUALIF_BARRAGE_ENTRANTS`) et servent à la fois à générer les matchs et à afficher les libellés. Vérifié avant/après : affichage identique de toutes les pages publiques, classement de poule identique sur 20 000 poules tirées au hasard.
+- *Scorer sur l'onglet Formule* : un scorer arrivait sur le contenu de l'onglet "Formule" (seul le bouton de l'onglet était caché) et pouvait cliquer une formule. Il arrive maintenant directement sur "Matchs & Résultats". Et changer de formule enregistre d'abord la nouvelle formule, puis seulement vide les poules — plus de poules effacées si l'enregistrement est refusé.
+- *Correction de score* : corriger un 1-1 + tie-break en 2-0 laissait un 3e set "fantôme" en base (le champ caché gardait sa valeur). Corrigé, et une correction qui change le vainqueur (ou rend le match non tranché) met désormais à jour le tour suivant — avec le même blocage que l'effacement si ce tour est déjà joué.
+- *Génération des barrages de qualif / du Maindraw / du tableau* : exigent maintenant des matchs **tranchés**, pas juste "avec un score" (un match en 2 sets gagnants avec un seul set saisi passait le contrôle).
+- *Départage par tête de série côté admin* : à la génération du tableau final, les équipes n'étaient pas triées par tête de série avant le calcul — avec un classement manuel, le dernier critère de départage pouvait différer de la page publique. Corrigé.
+- *Suivi d'équipe* : pour la petite finale, l'adversaire était annoncé "vainqueur de Demi 1" au lieu de "perdant de Demi 1".
+- *Menu ⚙* : pouvait apparaître en double (plusieurs événements de connexion traités en parallèle).
+- *Divers* : version de la librairie Supabase figée (avant : "dernière version 2.x", qui pouvait changer sans prévenir) ; requêtes des pages lancées en parallèle (chargement plus rapide) ; avertissement explicite quand supprimer une équipe efface les poules/scores de sa catégorie ; confirmation avant de supprimer un message de la boîte à idées ; tableau "Classement" construit sans `innerHTML` (les noms d'équipe sont une saisie libre) ; places inconnues décrites côté admin ("Vainqueur Barrage 2" au lieu de "À déterminer") ; le bloc de chaque terrain dans "Ordre des matchs" s'appelle "Programme" (il contient aussi les phases finales).

@@ -43,10 +43,7 @@ categoryButtons.forEach((button) => {
   });
 });
 
-// Seul ce compte peut supprimer un compte ou déclasser un autre admin (aussi
-// vérifié côté serveur dans assign_role/delete_account — ceci n'est qu'un
-// confort d'affichage, pas la vraie barrière de sécurité).
-const SUPER_ADMIN_EMAIL = "gabriel.cohen.1997@gmail.com";
+// SUPER_ADMIN_EMAIL (le compte "Propriétaire") est défini dans js/tournoi-commun.js.
 let currentUserEmail = null;
 
 const adminEmailDisplay = document.getElementById("admin-email-display");
@@ -81,6 +78,20 @@ function applyTabVisibility() {
   poulesTabButton.hidden = !(isAdminRole && formatChosen);
   matchsTabButton.hidden = !(hasAccessRole && formatChosen);
   formuleTabButton.hidden = !isAdminRole;
+
+  // L'onglet affiché ne doit jamais être un onglet caché (ex: un scorer arrivait sur
+  // "Formule", dont seul le bouton était caché, pas le contenu) : on bascule sur le
+  // premier onglet visible. Aucun onglet visible (compte sans rôle) -> rien d'affiché.
+  const activeButton = document.querySelector(".tab-button.active");
+  if (!activeButton || activeButton.hidden) {
+    const firstVisible = [...tabButtons].find((b) => !b.hidden);
+    if (firstVisible) {
+      firstVisible.click();
+    } else {
+      tabButtons.forEach((b) => b.classList.remove("active"));
+      tabPanels.forEach((panel) => (panel.hidden = true));
+    }
+  }
 }
 
 function applyRoleUI(role) {
@@ -178,7 +189,12 @@ async function loadFeedbackList() {
     deleteButton.className = "button button-danger button-sm";
     deleteButton.textContent = "Supprimer";
     deleteButton.addEventListener("click", async () => {
-      await supabaseClient.from("site_feedback").delete().eq("id", entry.id);
+      if (!confirm("Supprimer ce message ?")) return;
+      const { error: deleteError } = await supabaseClient.from("site_feedback").delete().eq("id", entry.id);
+      if (deleteError) {
+        alert("Erreur : " + deleteError.message);
+        return;
+      }
       loadFeedbackList();
     });
     card.appendChild(deleteButton);
@@ -257,16 +273,16 @@ formatButtons.forEach((button) => {
     // des deux catégories sont réinitialisés (ils dépendent du nombre d'équipes
     // attendu par la formule), mais les équipes déjà inscrites restent — pas besoin
     // de les réinscrire après coup. resetPools ne touche jamais à la table `teams`.
-    if (currentFormat !== null) {
+    const hadFormat = currentFormat !== null;
+    if (hadFormat) {
       const confirmed = confirm(
         "Changer de formule réinitialise les poules et matchs en cours, pour les deux catégories. Les équipes déjà inscrites restent, mais il faudra régénérer les poules. Continuer ?"
       );
       if (!confirmed) return;
-
-      await resetPools("Hommes");
-      await resetPools("Femmes");
     }
 
+    // La formule est enregistrée AVANT de vider les poules : si l'enregistrement est
+    // refusé, on s'arrête là sans avoir rien effacé.
     const { error } = await supabaseClient
       .from("tournament_formats")
       .upsert({ id: 1, format });
@@ -275,6 +291,11 @@ formatButtons.forEach((button) => {
       formatMessage.textContent = "Erreur : " + error.message;
       formatMessage.style.color = "var(--color-coral)";
       return;
+    }
+
+    if (hadFormat) {
+      await resetPools("Hommes");
+      await resetPools("Femmes");
     }
 
     currentFormat = format;
@@ -493,14 +514,6 @@ inscriptionForm.addEventListener("submit", async (event) => {
   loadAdminData();
 });
 
-function formatTeamDetail(team) {
-  return `${team.player1_prenom} ${team.player1_nom} / ${team.player2_prenom} ${team.player2_nom}`;
-}
-
-function teamPoints(team) {
-  return Number(team.points || 0);
-}
-
 function formatTeamDetailWithPoints(team) {
   return `${formatTeamDetail(team)} — ${teamPoints(team)} pts`;
 }
@@ -645,21 +658,6 @@ const qualifSeedPreview = document.getElementById("qualif-seed-preview");
 let seedTeams = [];
 let allTeams = [];
 
-// Tant qu'aucun classement manuel n'a encore été fait pour la catégorie (tous les
-// teams.seed sont null), l'ordre par défaut des têtes de série vient des points
-// de la paire (décroissant). Dès qu'un classement manuel existe, on le respecte
-// tel quel (nouvelles équipes ajoutées en dernier, à ajuster à la main).
-function defaultSeedOrder(teams) {
-  const hasManualSeed = teams.some((team) => team.seed != null);
-  if (hasManualSeed) return teams;
-
-  return teams.slice().sort((a, b) => {
-    const diff = teamPoints(b) - teamPoints(a);
-    if (diff !== 0) return diff;
-    return new Date(a.created_at) - new Date(b.created_at);
-  });
-}
-
 // Le classement (glisser-déposer) est persisté en base dans teams.seed,
 // donc il survit aux rechargements. Nouvelles équipes (seed = null) en dernier.
 async function saveSeedOrder() {
@@ -673,33 +671,23 @@ async function saveSeedOrder() {
 async function loadAdminData() {
   importCategoryLabel.textContent = currentCategory;
 
-  const { data: pools, error: poolsError } = await supabaseClient
-    .from("pools")
-    .select("*")
-    .order("label");
-
-  const { data: teams, error: teamsError } = await supabaseClient
-    .from("teams")
-    .select("*")
-    .order("seed", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: true });
-
-  const { data: matches, error: matchesError } = await supabaseClient
-    .from("matches")
-    .select("*, sets(*)")
-    .eq("phase", "poule")
-    .order("id", { ascending: true });
-
-  const { data: bracketMatches, error: bracketError } = await supabaseClient
-    .from("matches")
-    .select("*, sets(*)")
-    .in("phase", ["barrage", "quart", "demi", "petite_finale", "finale"])
-    .order("slot");
-
-  const { data: qualifMatches, error: qualifError } = await supabaseClient
-    .from("matches")
-    .select("*, sets(*)")
-    .in("phase", ["qualif_poule", "qualif_barrage1", "qualif_barrage2"]);
+  const [
+    { data: pools, error: poolsError },
+    { data: teams, error: teamsError },
+    { data: matches, error: matchesError },
+    { data: bracketMatches, error: bracketError },
+    { data: qualifMatches, error: qualifError },
+  ] = await Promise.all([
+    supabaseClient.from("pools").select("*").order("label"),
+    supabaseClient
+      .from("teams")
+      .select("*")
+      .order("seed", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true }),
+    supabaseClient.from("matches").select("*, sets(*)").eq("phase", "poule").order("id", { ascending: true }),
+    supabaseClient.from("matches").select("*, sets(*)").in("phase", PHASES_MAINDRAW_BRACKET).order("slot"),
+    supabaseClient.from("matches").select("*, sets(*)").in("phase", PHASES_QUALIF),
+  ]);
 
   if (poolsError || teamsError || matchesError || bracketError || qualifError) {
     poolsList.textContent = "Erreur de chargement des données.";
@@ -707,6 +695,9 @@ async function loadAdminData() {
   }
 
   allTeams = teams;
+  categoriesWithMatches = new Set(
+    [...pools, ...matches, ...bracketMatches, ...qualifMatches].map((row) => row.category)
+  );
   renderTeamsList(teams.filter((team) => team.category === currentCategory));
 
   const categoryPools = pools.filter((pool) => pool.category === currentCategory);
@@ -760,7 +751,7 @@ async function resetMaindraw(category) {
     .delete()
     .eq("category", category)
     .is("pool_id", null)
-    .in("phase", ["barrage", "quart", "demi", "petite_finale", "finale"]);
+    .in("phase", PHASES_MAINDRAW_BRACKET);
   await supabaseClient.from("teams").update({ pool_id: null }).eq("category", category);
   await supabaseClient.from("pools").delete().eq("category", category);
 }
@@ -772,7 +763,7 @@ async function resetQualif(category) {
     .from("matches")
     .delete()
     .eq("category", category)
-    .in("phase", ["qualif_poule", "qualif_barrage1", "qualif_barrage2"]);
+    .in("phase", PHASES_QUALIF);
 }
 
 function renderGenerateControls(count) {
@@ -820,6 +811,16 @@ function renderQualifSeedPreview() {
   qualifSeedPreview.appendChild(makeList(`Qualifications (${qualif.length}/16)`, qualif));
 }
 
+// Supprimer une équipe remet à zéro les poules/matchs/scores de sa catégorie (voir
+// resetPools) : on le dit clairement dans la confirmation quand il y a quelque chose à perdre.
+let categoriesWithMatches = new Set();
+
+function resetWarning(category) {
+  return categoriesWithMatches.has(category)
+    ? `\n\n⚠️ Les poules, matchs et scores ${category} déjà générés seront effacés (il faudra les régénérer).`
+    : "";
+}
+
 function renderTeamsList(teams) {
   teamsList.innerHTML = "";
   teamsCount.textContent = `${teams.length} équipe${teams.length > 1 ? "s" : ""} inscrite${teams.length > 1 ? "s" : ""}`;
@@ -859,7 +860,9 @@ function renderTeamsList(teams) {
     deleteButton.className = "button button-danger button-sm";
     deleteButton.textContent = "Supprimer";
     deleteButton.addEventListener("click", async () => {
-      const confirmed = confirm(`Supprimer l'équipe "${team.name}" ? Cette action est irréversible.`);
+      const confirmed = confirm(
+        `Supprimer l'équipe "${team.name}" ?${resetWarning(team.category)} Cette action est irréversible.`
+      );
       if (!confirmed) return;
 
       await resetPools(team.category);
@@ -889,12 +892,14 @@ deleteSelectedButton.addEventListener("click", async () => {
     return;
   }
 
-  const confirmed = confirm(`Supprimer les ${selectedTeamIds.size} équipes sélectionnées ? Cette action est irréversible.`);
-  if (!confirmed) return;
-
   const affectedCategories = new Set(
     allTeams.filter((team) => selectedTeamIds.has(team.id)).map((team) => team.category)
   );
+  const warnings = [...affectedCategories].map(resetWarning).join("");
+  const confirmed = confirm(
+    `Supprimer les ${selectedTeamIds.size} équipes sélectionnées ?${warnings} Cette action est irréversible.`
+  );
+  if (!confirmed) return;
   for (const category of affectedCategories) {
     await resetPools(category);
   }
@@ -996,7 +1001,9 @@ function renderSeedingList() {
 
     item.addEventListener("drop", (event) => {
       event.preventDefault();
-      const fromIndex = Number(seedingList.querySelector(".dragging").dataset.index);
+      const dragged = seedingList.querySelector(".dragging");
+      if (!dragged) return;
+      const fromIndex = Number(dragged.dataset.index);
       const toIndex = Number(item.dataset.index);
       moveSeed(fromIndex, toIndex);
     });
@@ -1097,16 +1104,6 @@ async function generatePools(teamCount) {
 generate12Button.addEventListener("click", () => generatePools(12));
 generate16Button.addEventListener("click", () => generatePools(16));
 
-// Vainqueur/perdant d'un match tranché (il faut 2 sets gagnés) — utilisé pour
-// dépouiller les qualifs (poules brésiliennes et barrages de qualif).
-function matchWinnerLoser(match) {
-  const sets = (match && match.sets) || [];
-  const wins1 = sets.filter((s) => s.score_team1 > s.score_team2).length;
-  const wins2 = sets.filter((s) => s.score_team2 > s.score_team1).length;
-  if (wins1 > wins2) return { winnerId: match.team1_id, loserId: match.team2_id };
-  return { winnerId: match.team2_id, loserId: match.team1_id };
-}
-
 // Formule "12-quali16" — étape 1 : les 24 équipes classées sont scindées en 8
 // "direct Maindraw" (têtes de série 1-8) et 16 "qualifs" (9-24). Les 16 de qualif
 // sont réparties en serpentin dans 4 poules brésiliennes (A-D) : tour 1 = 1v4 et
@@ -1170,17 +1167,17 @@ async function generateQualifBarrages() {
     return;
   }
 
-  if (!pouleMatches || pouleMatches.length !== 16 || pouleMatches.some((m) => !m.sets || m.sets.length === 0)) {
-    alert("Tous les matchs des poules de qualification (tour 1 et tour 2) doivent avoir un score.");
+  // "Tranché" et pas juste "a un score" : un match en 2 sets gagnants avec un seul
+  // set saisi n'a pas encore de vainqueur.
+  if (!pouleMatches || pouleMatches.length !== 16 || pouleMatches.some((m) => !matchResult(m))) {
+    alert("Tous les matchs des poules de qualification (tour 1 et tour 2) doivent être terminés.");
     return;
   }
 
   const bySlot = new Map(pouleMatches.map((m) => [m.slot, m]));
   const standings = {};
   ["A", "B", "C", "D"].forEach((letter) => {
-    const roundWinners = matchWinnerLoser(bySlot.get(`q${letter}-r2-w`));
-    const roundLosers = matchWinnerLoser(bySlot.get(`q${letter}-r2-l`));
-    standings[letter] = [roundWinners.winnerId, roundWinners.loserId, roundLosers.winnerId, roundLosers.loserId];
+    standings[letter] = computeBresilienneStandings(letter, bySlot);
   });
 
   const confirmed = confirm(
@@ -1194,20 +1191,15 @@ async function generateQualifBarrages() {
     .eq("category", currentCategory)
     .in("phase", ["qualif_barrage1", "qualif_barrage2"]);
 
-  const first = (letter) => standings[letter][0];
-  const second = (letter) => standings[letter][1];
-  const third = (letter) => standings[letter][2];
-
-  const rows = [
-    { phase: "qualif_barrage1", slot: "qb1", category: currentCategory, team1_id: second("A"), team2_id: third("C"), status: "a_venir" },
-    { phase: "qualif_barrage1", slot: "qb2", category: currentCategory, team1_id: second("B"), team2_id: third("D"), status: "a_venir" },
-    { phase: "qualif_barrage1", slot: "qb3", category: currentCategory, team1_id: second("C"), team2_id: third("A"), status: "a_venir" },
-    { phase: "qualif_barrage1", slot: "qb4", category: currentCategory, team1_id: second("D"), team2_id: third("B"), status: "a_venir" },
-    { phase: "qualif_barrage2", slot: "qb5", category: currentCategory, team1_id: first("A"), team2_id: null, status: "a_venir" },
-    { phase: "qualif_barrage2", slot: "qb6", category: currentCategory, team1_id: first("B"), team2_id: null, status: "a_venir" },
-    { phase: "qualif_barrage2", slot: "qb7", category: currentCategory, team1_id: first("C"), team2_id: null, status: "a_venir" },
-    { phase: "qualif_barrage2", slot: "qb8", category: currentCategory, team1_id: first("D"), team2_id: null, status: "a_venir" },
-  ];
+  // Croisements : QUALIF_BARRAGE_ENTRANTS (js/tournoi-commun.js).
+  const rows = Object.entries(QUALIF_BARRAGE_ENTRANTS).map(([slot, entrants]) => ({
+    phase: Number(slot.slice(2)) <= 4 ? "qualif_barrage1" : "qualif_barrage2",
+    slot,
+    category: currentCategory,
+    team1_id: entrants[0] ? standings[entrants[0].pool][entrants[0].rank - 1] : null,
+    team2_id: entrants[1] ? standings[entrants[1].pool][entrants[1].rank - 1] : null,
+    status: "a_venir",
+  }));
 
   const { error: insertError } = await supabaseClient.from("matches").insert(rows);
   if (insertError) {
@@ -1233,12 +1225,12 @@ async function generateMaindrawFromQualif() {
     return;
   }
 
-  if (!barrage2Matches || barrage2Matches.length !== 4 || barrage2Matches.some((m) => !m.sets || m.sets.length === 0)) {
-    alert("Les 4 barrages de qualification (2e tour) doivent tous avoir un score.");
+  if (!barrage2Matches || barrage2Matches.length !== 4 || barrage2Matches.some((m) => !matchResult(m))) {
+    alert("Les 4 barrages de qualification (2e tour) doivent tous être terminés.");
     return;
   }
 
-  const qualifierIds = barrage2Matches.map((match) => matchWinnerLoser(match).winnerId);
+  const qualifierIds = barrage2Matches.map((match) => matchResult(match).winnerId);
 
   const { data: qualifierTeams, error: teamsError } = await supabaseClient
     .from("teams")
@@ -1250,11 +1242,7 @@ async function generateMaindrawFromQualif() {
   }
 
   const directTeams = seedTeams.slice(0, 8);
-  const maindrawTeams = [...directTeams, ...qualifierTeams].sort((a, b) => {
-    const diff = teamPoints(b) - teamPoints(a);
-    if (diff !== 0) return diff;
-    return new Date(a.created_at) - new Date(b.created_at);
-  });
+  const maindrawTeams = [...directTeams, ...qualifierTeams].sort(compareByPoints);
 
   const confirmed = confirm(
     `Générer les 4 poules du Maindraw ${currentCategory} avec les 8 équipes direct + les 4 équipes qualifiées ? Les poules du Maindraw existantes pour cette catégorie seront remplacées.`
@@ -1293,49 +1281,11 @@ function poolRoundRobin(teamIds) {
   return [];
 }
 
-// Barrage/quart/demi gagné -> l'équipe gagnante est placée dans le match suivant du tableau.
-// Les demies ont en plus une place "loser" : le perdant va en petite finale.
-const BRACKET_PROGRESSION = {
-  "barrage-1": { winner: { nextSlot: "qf-2", position: "team2_id" } },
-  "barrage-2": { winner: { nextSlot: "qf-1", position: "team2_id" } },
-  "barrage-3": { winner: { nextSlot: "qf-4", position: "team2_id" } },
-  "barrage-4": { winner: { nextSlot: "qf-3", position: "team2_id" } },
-  "qf-1": { winner: { nextSlot: "sf-1", position: "team1_id" } },
-  "qf-2": { winner: { nextSlot: "sf-1", position: "team2_id" } },
-  "qf-3": { winner: { nextSlot: "sf-2", position: "team1_id" } },
-  "qf-4": { winner: { nextSlot: "sf-2", position: "team2_id" } },
-  "sf-1": {
-    winner: { nextSlot: "finale", position: "team1_id" },
-    loser: { nextSlot: "petite-finale", position: "team1_id" },
-  },
-  "sf-2": {
-    winner: { nextSlot: "finale", position: "team2_id" },
-    loser: { nextSlot: "petite-finale", position: "team2_id" },
-  },
-
-  // Formule "12-quali16" : poules de qualif en poule brésilienne (tour 1 = 1v4/2v3,
-  // tour 2 = vainqueurs entre eux pour les places 1-2, perdants entre eux pour 3-4),
-  // puis 2 tours de barrages de qualif (voir generateQualifBarrages).
-  "qA-r1-1": { winner: { nextSlot: "qA-r2-w", position: "team1_id" }, loser: { nextSlot: "qA-r2-l", position: "team1_id" } },
-  "qA-r1-2": { winner: { nextSlot: "qA-r2-w", position: "team2_id" }, loser: { nextSlot: "qA-r2-l", position: "team2_id" } },
-  "qB-r1-1": { winner: { nextSlot: "qB-r2-w", position: "team1_id" }, loser: { nextSlot: "qB-r2-l", position: "team1_id" } },
-  "qB-r1-2": { winner: { nextSlot: "qB-r2-w", position: "team2_id" }, loser: { nextSlot: "qB-r2-l", position: "team2_id" } },
-  "qC-r1-1": { winner: { nextSlot: "qC-r2-w", position: "team1_id" }, loser: { nextSlot: "qC-r2-l", position: "team1_id" } },
-  "qC-r1-2": { winner: { nextSlot: "qC-r2-w", position: "team2_id" }, loser: { nextSlot: "qC-r2-l", position: "team2_id" } },
-  "qD-r1-1": { winner: { nextSlot: "qD-r2-w", position: "team1_id" }, loser: { nextSlot: "qD-r2-l", position: "team1_id" } },
-  "qD-r1-2": { winner: { nextSlot: "qD-r2-w", position: "team2_id" }, loser: { nextSlot: "qD-r2-l", position: "team2_id" } },
-  "qb1": { winner: { nextSlot: "qb6", position: "team2_id" } },
-  "qb2": { winner: { nextSlot: "qb5", position: "team2_id" } },
-  "qb3": { winner: { nextSlot: "qb8", position: "team2_id" } },
-  "qb4": { winner: { nextSlot: "qb7", position: "team2_id" } },
-};
-
-function requiredSetWins(phase) {
-  return phase === "poule" ? 1 : 2;
-}
+// La propagation des vainqueurs (BRACKET_PROGRESSION) et requiredSetWins sont
+// définis dans js/tournoi-commun.js.
 
 // Points à atteindre pour gagner un set donné, selon la phase (règles du tournoi,
-// voir section 7 du GUIDE.md) : poule = 21 ; barrage = 15 (tie-break 11) ;
+// voir section 8 du GUIDE.md) : poule = 21 ; barrage = 15 (tie-break 11) ;
 // quart/demi/petite finale/finale = 21 (tie-break 15) — SAUF en formule
 // "12-quali16", où tout le Maindraw (hors poules) se joue en 15 (tie-break 11),
 // comme les qualifs (poules brésiliennes et barrages de qualif, toujours 15/11).
@@ -1358,69 +1308,98 @@ function isValidSetScore(target, score1, score2) {
   return true;
 }
 
-// Vide le score d'un match déjà joué (tous les champs effacés puis "Enregistrer") :
-// supprime ses sets et le remet "a_venir". Si ce match avait déjà fait avancer une
-// équipe au tour suivant (BRACKET_PROGRESSION), ça défait aussi cette propagation —
-// sauf si le match suivant a déjà été joué avec cette équipe, auquel cas on bloque
-// (il faut d'abord effacer SON score, en remontant le tableau pas à pas).
-async function clearMatchSets(match) {
+// Les équipes qu'un match a fait avancer au tour suivant (BRACKET_PROGRESSION) ne
+// peuvent être retirées/remplacées que si ce match suivant n'a pas encore été joué.
+// Sinon on bloque : il faut d'abord effacer le score du match suivant, en remontant
+// le tableau pas à pas. Retourne true si on peut y toucher.
+async function canChangePropagation(match) {
   const progression = BRACKET_PROGRESSION[match.slot];
-  const nextSlots = progression
-    ? [progression.winner, progression.loser].filter(Boolean).map((p) => p.nextSlot)
-    : [];
+  if (!progression) return true;
+  const nextSlots = [progression.winner, progression.loser].filter(Boolean).map((p) => p.nextSlot);
 
-  if (nextSlots.length > 0) {
-    const { data: nextMatches, error } = await supabaseClient
-      .from("matches")
-      .select("*, sets(*)")
-      .eq("category", match.category)
-      .in("slot", nextSlots);
-    if (error) {
-      alert("Erreur : " + error.message);
-      return;
-    }
-    const alreadyPlayed = (nextMatches || []).some((m) => m.sets && m.sets.length > 0);
-    if (alreadyPlayed) {
-      alert(
-        "Impossible d'effacer ce score : le match suivant a déjà été joué avec l'équipe issue de ce match. Efface d'abord son score à lui."
-      );
-      return;
-    }
+  const { data: nextMatches, error } = await supabaseClient
+    .from("matches")
+    .select("*, sets(*)")
+    .eq("category", match.category)
+    .in("slot", nextSlots);
+  if (error) {
+    alert("Erreur : " + error.message);
+    return false;
   }
+  if ((nextMatches || []).some((m) => m.sets && m.sets.length > 0)) {
+    alert(
+      "Impossible : le match suivant a déjà été joué avec l'équipe issue de ce match. Efface d'abord son score à lui."
+    );
+    return false;
+  }
+  return true;
+}
+
+// Place le vainqueur (et pour les demies/poules de qualif, le perdant) dans le match
+// suivant — ou vide ces places si `result` est null. Le filtre par catégorie est
+// essentiel : un "qf-1" Hommes et un "qf-1" Femmes ont le même slot.
+async function applyPropagation(match, result) {
+  const progression = BRACKET_PROGRESSION[match.slot];
+  if (!progression) return;
+  for (const outcome of ["winner", "loser"]) {
+    const target = progression[outcome];
+    if (!target) continue;
+    const teamId = result ? (outcome === "winner" ? result.winnerId : result.loserId) : null;
+    await supabaseClient
+      .from("matches")
+      .update({ [target.position]: teamId })
+      .eq("slot", target.nextSlot)
+      .eq("category", match.category);
+  }
+}
+
+function forgetDrafts(match) {
+  [1, 2, 3].forEach((setNumber) => draftScores.delete(`${match.id}-${setNumber}`));
+}
+
+// Vide le score d'un match (tous les champs effacés puis "Enregistrer") : supprime
+// ses sets, le remet "a_venir", et défait l'éventuelle propagation au tour suivant.
+// Retourne false si l'action a été bloquée.
+async function clearMatchSets(match) {
+  if (matchResult(match) && !(await canChangePropagation(match))) return false;
 
   await supabaseClient.from("sets").delete().eq("match_id", match.id);
   await supabaseClient.from("matches").update({ status: "a_venir" }).eq("id", match.id);
+  if (matchResult(match)) await applyPropagation(match, null);
 
-  if (progression) {
-    if (progression.winner) {
-      await supabaseClient
-        .from("matches")
-        .update({ [progression.winner.position]: null })
-        .eq("slot", progression.winner.nextSlot)
-        .eq("category", match.category);
-    }
-    if (progression.loser) {
-      await supabaseClient
-        .from("matches")
-        .update({ [progression.loser.position]: null })
-        .eq("slot", progression.loser.nextSlot)
-        .eq("category", match.category);
-    }
-  }
-
-  [1, 2, 3].forEach((setNumber) => draftScores.delete(`${match.id}-${setNumber}`));
+  forgetDrafts(match);
   loadAdminData();
+  return true;
 }
 
-// Enregistre les sets saisis (les sets laissés vides sont ignorés), détermine si le match
-// est terminé (une équipe a atteint le nombre de sets gagnants requis) et, si oui, propage
-// le vainqueur — et pour les demies, aussi le perdant — dans le match suivant du tableau.
-// Le filtre par catégorie sur les mises à jour est essentiel : sans lui, un match
-// "qf-1" homme et un match "qf-1" femme (même slot, catégories différentes)
-// s'écraseraient l'un l'autre.
+// Enregistre les sets saisis. Les sets enregistrés auparavant mais plus saisis
+// (ex: un tie-break devenu inutile après correction d'un score en 2-0) sont
+// supprimés. Le statut du match et la propagation au tour suivant suivent le
+// nouveau résultat : si le vainqueur change (ou si le match n'est plus tranché),
+// l'ancienne propagation est défaite — bloqué si le match suivant a déjà été joué.
+// Retourne false si l'action a été bloquée.
 async function saveMatchSets(match, enteredSets) {
-  const existingBySetNumber = new Map((match.sets || []).map((s) => [s.set_number, s]));
+  const previous = matchResult(match);
+  const next = matchResult({
+    ...match,
+    sets: enteredSets.map(({ setNumber, score1, score2 }) => ({
+      set_number: setNumber,
+      score_team1: score1,
+      score_team2: score2,
+    })),
+  });
+  const resultChanged =
+    Boolean(previous) !== Boolean(next) || (previous && next && previous.winnerId !== next.winnerId);
 
+  if (previous && resultChanged && !(await canChangePropagation(match))) return false;
+
+  const enteredNumbers = new Set(enteredSets.map((s) => s.setNumber));
+  const staleSetIds = (match.sets || []).filter((s) => !enteredNumbers.has(s.set_number)).map((s) => s.id);
+  if (staleSetIds.length > 0) {
+    await supabaseClient.from("sets").delete().in("id", staleSetIds);
+  }
+
+  const existingBySetNumber = new Map((match.sets || []).map((s) => [s.set_number, s]));
   for (const { setNumber, score1, score2 } of enteredSets) {
     const existing = existingBySetNumber.get(setNumber);
     if (existing) {
@@ -1433,43 +1412,18 @@ async function saveMatchSets(match, enteredSets) {
         .from("sets")
         .insert({ match_id: match.id, set_number: setNumber, score_team1: score1, score_team2: score2 });
     }
-    draftScores.delete(`${match.id}-${setNumber}`);
   }
 
-  const wins1 = enteredSets.filter((s) => s.score1 > s.score2).length;
-  const wins2 = enteredSets.filter((s) => s.score2 > s.score1).length;
-  const needed = requiredSetWins(match.phase);
+  await supabaseClient
+    .from("matches")
+    .update({ status: next ? "termine" : "a_venir" })
+    .eq("id", match.id);
 
-  if (wins1 < needed && wins2 < needed) {
-    // Match pas encore terminé (ex: seulement le 1er set d'un barrage) : on sauvegarde, c'est tout.
-    loadAdminData();
-    return;
-  }
+  if (resultChanged) await applyPropagation(match, next);
 
-  await supabaseClient.from("matches").update({ status: "termine" }).eq("id", match.id);
-
-  const winnerId = wins1 > wins2 ? match.team1_id : match.team2_id;
-  const loserId = wins1 > wins2 ? match.team2_id : match.team1_id;
-
-  const progression = BRACKET_PROGRESSION[match.slot];
-  if (progression) {
-    if (progression.winner) {
-      await supabaseClient
-        .from("matches")
-        .update({ [progression.winner.position]: winnerId })
-        .eq("slot", progression.winner.nextSlot)
-        .eq("category", match.category);
-    }
-    if (progression.loser) {
-      await supabaseClient
-        .from("matches")
-        .update({ [progression.loser.position]: loserId })
-        .eq("slot", progression.loser.nextSlot)
-        .eq("category", match.category);
-    }
-  }
-
+  forgetDrafts(match);
   loadAdminData();
+  return true;
 }
 
 function teamLabel(teamId, teamsById) {
@@ -1561,19 +1515,27 @@ function collectEnteredSets(setInputs, phase) {
 // Une ligne de match, réutilisée pour les matchs de poule et le tableau final — toujours
 // sur une seule ligne. Les matchs de poule ont 1 set ; les autres en ont 2, avec un 3e
 // (tie-break) qui n'apparaît que si les deux premiers sets sont à 1-1.
-// Tant que les deux équipes ne sont pas connues (barrage pas encore joué), on affiche
-// juste "À déterminer" à la place du formulaire de score — sauf si `options.placeholders`
-// fournit un texte plus précis (ex: "Vainqueur du Barrage 2") pour ce match précis.
-// `options.label` ajoute en plus une étiquette devant le match (ex: "Barrage 3"),
-// utile quand il faut pouvoir citer un match précis par son numéro (barrages de qualif).
+// Tant que les deux équipes ne sont pas connues (tour précédent pas encore joué), pas
+// de formulaire de score, et l'équipe manquante est décrite par son croisement
+// ("Vainqueur Barrage 2", "Vainqueur du Barrage 1" pour les barrages de qualif).
+// `options.label` ajoute une étiquette devant le match (ex: "Barrage 3"), utile quand
+// il faut pouvoir citer un match précis par son numéro (barrages de qualif).
+function adminSlotPlaceholder(slot, index) {
+  if (!slot) return "À déterminer";
+  if (slot.startsWith("qb")) {
+    return slotPlaceholder(slot, index, { sourceLabel: (source) => `du Barrage ${source.slice(2)}` });
+  }
+  return slotPlaceholder(slot, index);
+}
+
 function createMatchRow(match, teamsById, options = {}) {
-  const { label, placeholders = {} } = options;
+  const { label } = options;
   const bothTeamsKnown = Boolean(match.team1_id && match.team2_id);
   const isMultiSet = match.phase !== "poule";
   const setsByNumber = new Map((match.sets || []).map((s) => [s.set_number, s]));
   const setInputs = [];
-  const team1Label = match.team1_id ? teamLabel(match.team1_id, teamsById) : placeholders.team1 || "À déterminer";
-  const team2Label = match.team2_id ? teamLabel(match.team2_id, teamsById) : placeholders.team2 || "À déterminer";
+  const team1Label = match.team1_id ? teamLabel(match.team1_id, teamsById) : adminSlotPlaceholder(match.slot, 0);
+  const team2Label = match.team2_id ? teamLabel(match.team2_id, teamsById) : adminSlotPlaceholder(match.slot, 1);
 
   const row = document.createElement("div");
   row.className = match.status === "termine" ? "match-row match-row-done" : "match-row";
@@ -1619,7 +1581,7 @@ function createMatchRow(match, teamsById, options = {}) {
   if (bothTeamsKnown && !isMultiSet) {
     const pair = buildScorePair(match.id, 1, setsByNumber.get(1));
     actions.appendChild(pair.wrapper);
-    setInputs.push({ setNumber: 1, input1: pair.input1, input2: pair.input2 });
+    setInputs.push({ setNumber: 1, ...pair });
   } else if (bothTeamsKnown && isMultiSet) {
     const setsWrap = document.createElement("div");
     setsWrap.className = "match-sets-inline";
@@ -1633,9 +1595,9 @@ function createMatchRow(match, teamsById, options = {}) {
     setsWrap.appendChild(pair3.wrapper);
     actions.appendChild(setsWrap);
 
-    setInputs.push({ setNumber: 1, input1: pair1.input1, input2: pair1.input2 });
-    setInputs.push({ setNumber: 2, input1: pair2.input1, input2: pair2.input2 });
-    setInputs.push({ setNumber: 3, input1: pair3.input1, input2: pair3.input2 });
+    setInputs.push({ setNumber: 1, ...pair1 });
+    setInputs.push({ setNumber: 2, ...pair2 });
+    setInputs.push({ setNumber: 3, ...pair3 });
 
     const updateTieBreakVisibility = () => {
       const winner1 = setWinner(pair1.input1, pair1.input2);
@@ -1665,27 +1627,33 @@ function createMatchRow(match, teamsById, options = {}) {
     saveButton.type = "button";
     saveButton.className = "button button-sm";
     saveButton.textContent = "Enregistrer";
-    saveButton.addEventListener("click", () => {
+    saveButton.addEventListener("click", async () => {
       // Désactivé dès le clic : sans ça, un double-clic (ou un clic avant la fin du
       // rechargement précédent) relance saveMatchSets avec le même match.sets périmé,
       // qui ne voit pas encore le set tout juste créé et en RE-insère un en double au
-      // lieu de le mettre à jour. Le bouton est de toute façon remplacé à chaque
-      // loadAdminData(), donc pas besoin de le réactiver à la main après coup.
+      // lieu de le mettre à jour. Le bouton est remplacé à chaque loadAdminData() ;
+      // on ne le réactive à la main que si l'action a été bloquée.
       if (saveButton.disabled) return;
+
+      // Le tie-break caché (sets à 2-0) est ignoré, même s'il contient encore une
+      // ancienne valeur : sinon il serait ré-enregistré comme un 3e set fantôme.
+      const visibleInputs = setInputs.filter(({ wrapper }) => !wrapper.hidden);
 
       // Tous les champs vidés sur un match qui avait déjà un score : au lieu de
       // bloquer avec "entrer un score valide", on efface le score existant.
-      const allEmpty = setInputs.every(({ input1, input2 }) => input1.value === "" && input2.value === "");
+      const allEmpty = visibleInputs.every(({ input1, input2 }) => input1.value === "" && input2.value === "");
+      let action;
       if (allEmpty && match.sets && match.sets.length > 0) {
-        saveButton.disabled = true;
-        clearMatchSets(match);
-        return;
+        action = () => clearMatchSets(match);
+      } else {
+        const enteredSets = collectEnteredSets(visibleInputs, match.phase);
+        if (!enteredSets) return;
+        action = () => saveMatchSets(match, enteredSets);
       }
 
-      const enteredSets = collectEnteredSets(setInputs, match.phase);
-      if (!enteredSets) return;
       saveButton.disabled = true;
-      saveMatchSets(match, enteredSets);
+      const done = await action();
+      if (!done) saveButton.disabled = false;
     });
     actions.appendChild(saveButton);
   }
@@ -1768,28 +1736,6 @@ function renderMatchesTab(pools, teams, matches) {
 
 // --- Formule "12-quali16" : section "Qualifications" de l'onglet Matchs & Résultats ---
 
-// Numéro affiché devant chaque barrage de qualif (slot qb1..qb8 -> "Barrage 1".."Barrage 8"),
-// et texte de remplacement pour l'équipe pas encore connue d'un match du 2e tour (qb5-qb8) :
-// au lieu d'un "À déterminer" générique, on dit explicitement quel barrage il faut suivre
-// pour savoir qui on affrontera (le croisement est fixé dans generateQualifBarrages).
-const QUALIF_BARRAGE_LABELS = {
-  qb1: "Barrage 1",
-  qb2: "Barrage 2",
-  qb3: "Barrage 3",
-  qb4: "Barrage 4",
-  qb5: "Barrage 5",
-  qb6: "Barrage 6",
-  qb7: "Barrage 7",
-  qb8: "Barrage 8",
-};
-
-const QUALIF_BARRAGE_PLACEHOLDERS = {
-  qb5: { team2: "Vainqueur du Barrage 2" },
-  qb6: { team2: "Vainqueur du Barrage 1" },
-  qb7: { team2: "Vainqueur du Barrage 4" },
-  qb8: { team2: "Vainqueur du Barrage 3" },
-};
-
 const qualifSection = document.getElementById("qualif-section");
 const qualifInfo = document.getElementById("qualif-info");
 const qualifPoolsList = document.getElementById("qualif-pools-list");
@@ -1822,7 +1768,7 @@ function renderQualifSection(teams, qualifMatches) {
     qualifPoolsList.appendChild(group);
   });
 
-  const pouleMissingScore = pouleMatches.length !== 16 || pouleMatches.some((m) => !m.sets || m.sets.length === 0);
+  const pouleMissingScore = pouleMatches.length !== 16 || pouleMatches.some((m) => !matchResult(m));
   generateQualifBarragesButton.hidden = pouleMissingScore;
 
   qualifBarragesList.innerHTML = "";
@@ -1833,16 +1779,13 @@ function renderQualifSection(teams, qualifMatches) {
     const { group, content } = createCollapsibleGroup("Barrages de qualification", `qualif-barrages-${currentCategory}`);
     allBarrages.forEach((match) => {
       content.appendChild(
-        createMatchRow(match, teamsById, {
-          label: QUALIF_BARRAGE_LABELS[match.slot],
-          placeholders: QUALIF_BARRAGE_PLACEHOLDERS[match.slot],
-        })
+        createMatchRow(match, teamsById, { label: `Barrage ${match.slot.slice(2)}` })
       );
     });
     qualifBarragesList.appendChild(group);
   }
 
-  const barrage2MissingScore = barrage2Matches.length !== 4 || barrage2Matches.some((m) => !m.sets || m.sets.length === 0);
+  const barrage2MissingScore = barrage2Matches.length !== 4 || barrage2Matches.some((m) => !matchResult(m));
   generateMaindrawButton.hidden = barrage2MissingScore;
 }
 
@@ -1861,96 +1804,8 @@ const BRACKET_GROUPS = [
   { label: "Finales", phases: ["petite_finale", "finale"] },
 ];
 
-// Compare deux équipes par ratio de points (marqués / encaissés) sans jamais
-// diviser, pour éviter les soucis de division par zéro (une équipe qui n'a encaissé
-// aucun point) : équivalent à comparer bFor/bAgainst à aFor/aAgainst via un produit
-// en croix. Retourne > 0 si b doit passer devant a (même convention que `b - a`).
-function compareByPointRatio(aFor, aAgainst, bFor, bAgainst) {
-  return bFor * aAgainst - aFor * bAgainst;
-}
-
-// Classe les équipes d'une poule par victoires ; en cas d'égalité de victoires entre
-// plusieurs équipes (2 à égalité, ou "triangulaire" à 3 dans une poule de 4), l'ordre
-// de départage est : 1) ratio de points (marqués / encaissés, pas une différence)
-// UNIQUEMENT sur les matchs joués entre les équipes à égalité, 2) si toujours égal,
-// ratio de points face à la ou les équipes HORS du groupe (la "4e équipe"), 3) si
-// toujours égal, rang de tête de série.
-function computePoolStandings(pool, teams, poolMatches, seedRankByTeamId) {
-  const poolTeams = teams.filter((team) => team.pool_id === pool.id);
-  const teamsInPoolMatches = poolMatches.filter((match) => match.pool_id === pool.id);
-
-  const wins = new Map(poolTeams.map((team) => [team.id, 0]));
-  teamsInPoolMatches.forEach((match) => {
-    const set = match.sets && match.sets[0];
-    if (!set || !wins.has(match.team1_id) || !wins.has(match.team2_id)) return;
-    const winnerId = set.score_team1 > set.score_team2 ? match.team1_id : match.team2_id;
-    wins.set(winnerId, wins.get(winnerId) + 1);
-  });
-
-  const groupsByWins = new Map();
-  poolTeams.forEach((team) => {
-    const winCount = wins.get(team.id);
-    if (!groupsByWins.has(winCount)) groupsByWins.set(winCount, []);
-    groupsByWins.get(winCount).push(team);
-  });
-
-  const ranked = [];
-  [...groupsByWins.keys()]
-    .sort((a, b) => b - a)
-    .forEach((winCount) => {
-      const group = groupsByWins.get(winCount);
-      if (group.length === 1) {
-        ranked.push(group[0]);
-        return;
-      }
-
-      const groupIds = new Set(group.map((team) => team.id));
-      const subFor = new Map(group.map((team) => [team.id, 0]));
-      const subAgainst = new Map(group.map((team) => [team.id, 0]));
-      const externalFor = new Map(group.map((team) => [team.id, 0]));
-      const externalAgainst = new Map(group.map((team) => [team.id, 0]));
-
-      teamsInPoolMatches.forEach((match) => {
-        const set = match.sets && match.sets[0];
-        if (!set) return;
-        const inGroup1 = groupIds.has(match.team1_id);
-        const inGroup2 = groupIds.has(match.team2_id);
-        if (inGroup1 && inGroup2) {
-          subFor.set(match.team1_id, subFor.get(match.team1_id) + set.score_team1);
-          subAgainst.set(match.team1_id, subAgainst.get(match.team1_id) + set.score_team2);
-          subFor.set(match.team2_id, subFor.get(match.team2_id) + set.score_team2);
-          subAgainst.set(match.team2_id, subAgainst.get(match.team2_id) + set.score_team1);
-        } else if (inGroup1) {
-          externalFor.set(match.team1_id, externalFor.get(match.team1_id) + set.score_team1);
-          externalAgainst.set(match.team1_id, externalAgainst.get(match.team1_id) + set.score_team2);
-        } else if (inGroup2) {
-          externalFor.set(match.team2_id, externalFor.get(match.team2_id) + set.score_team2);
-          externalAgainst.set(match.team2_id, externalAgainst.get(match.team2_id) + set.score_team1);
-        }
-      });
-
-      const sortedGroup = group.slice().sort((a, b) => {
-        const ratioCmp = compareByPointRatio(
-          subFor.get(a.id),
-          subAgainst.get(a.id),
-          subFor.get(b.id),
-          subAgainst.get(b.id)
-        );
-        if (ratioCmp !== 0) return ratioCmp;
-        const extCmp = compareByPointRatio(
-          externalFor.get(a.id),
-          externalAgainst.get(a.id),
-          externalFor.get(b.id),
-          externalAgainst.get(b.id)
-        );
-        if (extCmp !== 0) return extCmp;
-        return seedRankByTeamId.get(a.id) - seedRankByTeamId.get(b.id);
-      });
-      ranked.push(...sortedGroup);
-    });
-
-  return ranked;
-}
+// Classement de poule (computePoolStandings) : js/tournoi-commun.js, le même que
+// celui affiché sur la page publique.
 
 generateBracketButton.addEventListener("click", async () => {
   try {
@@ -1961,10 +1816,14 @@ generateBracketButton.addEventListener("click", async () => {
       .order("label");
     if (poolsError) throw poolsError;
 
+    // Trié comme partout ailleurs : defaultSeedOrder en a besoin pour que le rang de
+    // tête de série (dernier critère de départage) soit le même que côté public.
     const { data: teams, error: teamsError } = await supabaseClient
       .from("teams")
       .select("*")
-      .eq("category", currentCategory);
+      .eq("category", currentCategory)
+      .order("seed", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true });
     if (teamsError) throw teamsError;
 
     const { data: poolMatches, error: poolMatchesError } = await supabaseClient
@@ -1979,7 +1838,7 @@ generateBracketButton.addEventListener("click", async () => {
       return;
     }
 
-    const missingScore = poolMatches.some((match) => !match.sets || match.sets.length === 0);
+    const missingScore = poolMatches.some((match) => !matchResult(match));
     if (missingScore) {
       alert("Tous les matchs de poule doivent avoir un score avant de générer le tableau des phases finales.");
       return;
@@ -1993,7 +1852,8 @@ generateBracketButton.addEventListener("click", async () => {
     const seedRankByTeamId = new Map(defaultSeedOrder(teams).map((team, index) => [team.id, index + 1]));
     const standings = {};
     pools.forEach((pool) => {
-      standings[pool.label] = computePoolStandings(pool, teams, poolMatches, seedRankByTeamId);
+      const teamsInPool = teams.filter((team) => team.pool_id === pool.id);
+      standings[pool.label] = computePoolStandings(pool, teamsInPool, poolMatches, seedRankByTeamId).map((row) => row.team);
     });
 
     for (const label of ["Poule A", "Poule B", "Poule C", "Poule D"]) {
@@ -2003,31 +1863,23 @@ generateBracketButton.addEventListener("click", async () => {
       }
     }
 
-    const first = (label) => standings[label][0].id;
-    const second = (label) => standings[label][1].id;
-    const third = (label) => standings[label][2].id;
-
     const { error: deleteError } = await supabaseClient
       .from("matches")
       .delete()
       .eq("category", currentCategory)
-      .in("phase", ["barrage", "quart", "demi", "petite_finale", "finale"]);
+      .in("phase", PHASES_MAINDRAW_BRACKET);
     if (deleteError) throw deleteError;
 
-    const rows = [
-      { phase: "barrage", slot: "barrage-1", category: currentCategory, team1_id: second("Poule C"), team2_id: third("Poule B"), status: "a_venir" },
-      { phase: "barrage", slot: "barrage-2", category: currentCategory, team1_id: second("Poule B"), team2_id: third("Poule C"), status: "a_venir" },
-      { phase: "barrage", slot: "barrage-3", category: currentCategory, team1_id: second("Poule D"), team2_id: third("Poule A"), status: "a_venir" },
-      { phase: "barrage", slot: "barrage-4", category: currentCategory, team1_id: second("Poule A"), team2_id: third("Poule D"), status: "a_venir" },
-      { phase: "quart", slot: "qf-1", category: currentCategory, team1_id: first("Poule A"), team2_id: null, status: "a_venir" },
-      { phase: "quart", slot: "qf-2", category: currentCategory, team1_id: first("Poule D"), team2_id: null, status: "a_venir" },
-      { phase: "quart", slot: "qf-3", category: currentCategory, team1_id: first("Poule B"), team2_id: null, status: "a_venir" },
-      { phase: "quart", slot: "qf-4", category: currentCategory, team1_id: first("Poule C"), team2_id: null, status: "a_venir" },
-      { phase: "demi", slot: "sf-1", category: currentCategory, team1_id: null, team2_id: null, status: "a_venir" },
-      { phase: "demi", slot: "sf-2", category: currentCategory, team1_id: null, team2_id: null, status: "a_venir" },
-      { phase: "petite_finale", slot: "petite-finale", category: currentCategory, team1_id: null, team2_id: null, status: "a_venir" },
-      { phase: "finale", slot: "finale", category: currentCategory, team1_id: null, team2_id: null, status: "a_venir" },
-    ];
+    // Croisements : MAINDRAW_BRACKET_ENTRANTS (js/tournoi-commun.js).
+    const teamIdFor = (entrant) => (entrant ? standings[`Poule ${entrant.pool}`][entrant.rank - 1].id : null);
+    const rows = Object.entries(MAINDRAW_BRACKET_ENTRANTS).map(([slot, entrants]) => ({
+      phase: MAINDRAW_BRACKET_PHASES[slot],
+      slot,
+      category: currentCategory,
+      team1_id: teamIdFor(entrants[0]),
+      team2_id: teamIdFor(entrants[1]),
+      status: "a_venir",
+    }));
 
     const { error: insertError } = await supabaseClient.from("matches").insert(rows);
     if (insertError) throw insertError;
@@ -2041,7 +1893,7 @@ generateBracketButton.addEventListener("click", async () => {
 function renderBracketTab(pools, teams, poolMatches, bracketMatches) {
   bracketList.innerHTML = "";
 
-  const poolMatchesMissingScore = pools.length === 4 && poolMatches.some((match) => !match.sets || match.sets.length === 0);
+  const poolMatchesMissingScore = pools.length === 4 && poolMatches.some((match) => !matchResult(match));
 
   if (pools.length !== 4) {
     bracketInfo.textContent = "Génère d'abord les poules.";

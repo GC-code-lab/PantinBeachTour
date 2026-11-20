@@ -1,19 +1,21 @@
-# Pantin Beach Tour
+# Sand System Tournament (Pantin Beach Tour)
 
-Site web du tournoi de beach volley. Côté public : poules (équipes, matchs, résultats) et tableau des phases finales. Les inscriptions et la gestion du tournoi (poules, matchs, scores) se font depuis l'espace admin.
+Site web de gestion d'un tournoi de beach volley : inscriptions, poules, qualifications, tableau final, ordre des matchs, suivi d'équipe et palmarès. Partie publique consultable par tous, partie admin protégée par compte.
+
+👉 **Toute la documentation est dans [GUIDE.md](GUIDE.md).**
 
 ## Aperçu en local
 
 Depuis ce dossier :
 
 ```
-python3 -m http.server 8000
+python3 serve.py
 ```
 
-Puis ouvrir http://localhost:8000 dans le navigateur.
+Puis ouvrir http://localhost:8000 dans le navigateur (`serve.py` désactive le cache navigateur, pratique pendant le développement).
 
 ## Stack
 
 - HTML / CSS / JS (pas de build, pas de framework)
-- [Supabase](https://supabase.com) pour la base de données, l'authentification et le temps réel
-- Hébergement : GitHub Pages
+- [Supabase](https://supabase.com) pour la base de données et l'authentification
+- Hébergement : GitHub Pages — https://gc-code-lab.github.io/PantinBeachTour/

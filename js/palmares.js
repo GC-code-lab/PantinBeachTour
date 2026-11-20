@@ -6,11 +6,10 @@ const MOIS = [
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
 
-// Seul le compte principal (voir SUPER_ADMIN_EMAIL dans gestion.js) peut supprimer
+// Seul le compte principal (SUPER_ADMIN_EMAIL, js/tournoi-commun.js) peut supprimer
 // un tournoi du Palmarès — un tournoi archivé n'a normalement pas vocation à être
 // retiré, ce bouton n'est là que pour rattraper une erreur de sauvegarde. Vérifié
 // aussi côté serveur dans delete_tournament_archive : ceci n'est qu'un affichage.
-const SUPER_ADMIN_EMAIL = "gabriel.cohen.1997@gmail.com";
 let isOwner = false;
 
 async function loadArchives() {
@@ -52,48 +51,6 @@ async function deleteArchive(archive) {
   }
 
   loadArchives();
-}
-
-// Même pattern que js/ordre-des-matchs.js / js/poules.js : un bouton-titre repliable
-// + son contenu (replié par défaut).
-function createCollapsibleSection(title) {
-  const header = document.createElement("button");
-  header.type = "button";
-  header.className = "pool-card-header";
-  header.setAttribute("aria-expanded", "false");
-
-  const labelSpan = document.createElement("span");
-  labelSpan.textContent = title;
-  header.appendChild(labelSpan);
-
-  const chevron = document.createElement("span");
-  chevron.className = "pool-card-chevron";
-  chevron.textContent = "▾";
-  header.appendChild(chevron);
-
-  const content = document.createElement("div");
-  content.className = "pool-card-content";
-  content.hidden = true;
-
-  header.addEventListener("click", () => {
-    const isOpen = header.getAttribute("aria-expanded") === "true";
-    header.setAttribute("aria-expanded", String(!isOpen));
-    content.hidden = isOpen;
-  });
-
-  const section = document.createElement("div");
-  section.className = "pool-card-section";
-  section.appendChild(header);
-  section.appendChild(content);
-
-  return { section, content };
-}
-
-function createNote(text) {
-  const note = document.createElement("p");
-  note.className = "form-message";
-  note.textContent = text;
-  return note;
 }
 
 function renderArchives(archives) {
