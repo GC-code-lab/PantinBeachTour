@@ -202,7 +202,7 @@ Une personne qui rentre le bon code dans le champ "Code" en créant son compte r
 
 ### Le compte principal (toi, Gabriel) — "Propriétaire"
 
-Le compte `gabriel.cohen.1997@gmail.com` a un statut à part, codé en dur dans la base de données (pas un rôle comme les autres — voir `assign_role`/`remove_role`/`delete_account`/`delete_tournament_archive` dans le SQL Supabase si tu dois le retrouver un jour) :
+Ton compte (Gabriel) a un statut à part, codé en dur **dans la base de données uniquement** (pas un rôle comme les autres — voir `assign_role`/`remove_role`/`delete_account`/`delete_tournament_archive`/`owner_email` dans le SQL Supabase si tu dois le retrouver un jour). Son adresse email n'est volontairement écrite ni dans le code du site ni dans ce guide, qui sont publics sur GitHub : le site la demande à la fonction SQL `owner_email()`, qui ne la donne qu'à un admin connecté.
 
 - Il s'affiche en haut de la liste "Comptes", avec un badge **"Propriétaire"** au lieu de "Admin", et personne (même toi) ne peut lui retirer ses droits admin via l'interface.
 - C'est le **seul** compte qui peut rétrograder un autre admin (les autres admins ne le peuvent pas entre eux).
@@ -231,7 +231,7 @@ Si tu vas dans Supabase → Table Editor, tu verras ces tables :
 - **`tournament_formats`** : une seule ligne (`id = 1`), avec la formule active du tournoi en cours (`"12"`, `"16"`, ou `"12-quali16"`) — voir section 4bis. Lisible par tout le monde (public), modifiable uniquement par un admin.
 - **`site_feedback`** : les messages de la boîte à idées "Amélioration du site" (`message`, `author_email`, date). Un admin ou un scorer peut en ajouter ; seuls les admins peuvent les lire et les supprimer (règles RLS côté Supabase).
 
-Fonctions SQL (RPC) appelées par le site : `list_all_accounts`, `assign_role`, `remove_role`, `delete_account`, `claim_role_with_code` (code d'inscription), `delete_tournament_archive`. Plus le déclencheur `auto_confirm_email_trigger` (voir section 12). Le code SQL lui-même n'est **pas** dans le dépôt GitHub : il n'existe que dans Supabase.
+Fonctions SQL (RPC) appelées par le site : `list_all_accounts`, `assign_role`, `remove_role`, `delete_account`, `claim_role_with_code` (code d'inscription), `delete_tournament_archive`, `owner_email` (renvoie l'email du compte Propriétaire, seulement à un admin connecté). Plus le déclencheur `auto_confirm_email_trigger` (voir section 12). Le code SQL lui-même n'est **pas** dans le dépôt GitHub : il n'existe que dans Supabase.
 
 ---
 
@@ -358,7 +358,7 @@ Pas de framework ni d'étape de build : chaque page HTML charge, dans cet ordre 
 
 | Fichier JS | Utilisé par | Rôle |
 |---|---|---|
-| `tournoi-commun.js` | toutes les pages | **La source de vérité** : croisements du tableau (`MAINDRAW_BRACKET_ENTRANTS`, `QUALIF_BARRAGE_ENTRANTS`), propagation des vainqueurs (`BRACKET_PROGRESSION`), classement de poule (`computePoolStandings`) et de poule brésilienne, vainqueur d'un match (`matchResult`), terrains et plannings (`GENDER_TERRAINS`, `MAINDRAW_SCHEDULE`, `QUALIF_SCHEDULE`), ordre des têtes de série, email du compte Propriétaire, petits outils d'affichage |
+| `tournoi-commun.js` | toutes les pages | **La source de vérité** : croisements du tableau (`MAINDRAW_BRACKET_ENTRANTS`, `QUALIF_BARRAGE_ENTRANTS`), propagation des vainqueurs (`BRACKET_PROGRESSION`), classement de poule (`computePoolStandings`) et de poule brésilienne, vainqueur d'un match (`matchResult`), terrains et plannings (`GENDER_TERRAINS`, `MAINDRAW_SCHEDULE`, `QUALIF_SCHEDULE`), ordre des têtes de série, lecture du compte Propriétaire (`fetchOwnerEmail`), petits outils d'affichage |
 | `gestion.js` | `gestion.html` | Tout l'admin : formule, inscriptions, import JSON, têtes de série, génération des poules/qualifs/tableau, saisie des scores, sauvegarde Palmarès, comptes/rôles, boîte à idées |
 | `login.js` | `admin.html` | Connexion et création de compte (avec code optionnel) |
 | `equipes.js` | `equipes.html` | Page Équipes |
@@ -432,3 +432,5 @@ Pas de framework ni d'étape de build : chaque page HTML charge, dans cet ordre 
 - *Suivi d'équipe* : pour la petite finale, l'adversaire était annoncé "vainqueur de Demi 1" au lieu de "perdant de Demi 1".
 - *Menu ⚙* : pouvait apparaître en double (plusieurs événements de connexion traités en parallèle).
 - *Divers* : version de la librairie Supabase figée (avant : "dernière version 2.x", qui pouvait changer sans prévenir) ; requêtes des pages lancées en parallèle (chargement plus rapide) ; avertissement explicite quand supprimer une équipe efface les poules/scores de sa catégorie ; confirmation avant de supprimer un message de la boîte à idées ; tableau "Classement" construit sans `innerHTML` (les noms d'équipe sont une saisie libre) ; places inconnues décrites côté admin ("Vainqueur Barrage 2" au lieu de "À déterminer") ; le bloc de chaque terrain dans "Ordre des matchs" s'appelle "Programme" (il contient aussi les phases finales).
+
+**Email du Propriétaire retiré du code public** (20/11/2026) : l'adresse du compte principal était écrite en clair dans le JavaScript du site et dans ce guide, donc lisible par n'importe qui sur GitHub ou dans le navigateur. Elle n'existe plus que côté Supabase : le site appelle la fonction SQL `owner_email()`, qui ne la renvoie qu'à un admin connecté (`null` pour tous les autres). Les vérifications de sécurité, elles, n'ont jamais dépendu du JavaScript (elles sont dans les fonctions SQL).

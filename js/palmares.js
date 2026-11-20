@@ -6,7 +6,7 @@ const MOIS = [
   "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre",
 ];
 
-// Seul le compte principal (SUPER_ADMIN_EMAIL, js/tournoi-commun.js) peut supprimer
+// Seul le compte principal (voir fetchOwnerEmail, js/tournoi-commun.js) peut supprimer
 // un tournoi du Palmarès — un tournoi archivé n'a normalement pas vocation à être
 // retiré, ce bouton n'est là que pour rattraper une erreur de sauvegarde. Vérifié
 // aussi côté serveur dans delete_tournament_archive : ceci n'est qu'un affichage.
@@ -113,6 +113,10 @@ function renderArchives(archives) {
 // session courante, si elle existe, pour savoir s'il faut afficher le bouton
 // "Supprimer" réservé au compte principal.
 supabaseClient.auth.onAuthStateChange((_event, session) => {
-  isOwner = Boolean(session && session.user.email === SUPER_ADMIN_EMAIL);
-  loadArchives();
+  // Différé : Supabase déconseille d'appeler ses fonctions directement dans ce callback.
+  setTimeout(async () => {
+    const ownerEmail = session ? await fetchOwnerEmail() : null;
+    isOwner = Boolean(ownerEmail) && session.user.email === ownerEmail;
+    loadArchives();
+  }, 0);
 });

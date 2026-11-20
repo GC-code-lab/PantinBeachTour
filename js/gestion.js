@@ -43,7 +43,6 @@ categoryButtons.forEach((button) => {
   });
 });
 
-// SUPER_ADMIN_EMAIL (le compte "Propriétaire") est défini dans js/tournoi-commun.js.
 let currentUserEmail = null;
 
 const adminEmailDisplay = document.getElementById("admin-email-display");
@@ -312,7 +311,8 @@ const accountsList = document.getElementById("accounts-list");
 // Liste unique de tous les comptes (avec ou sans rôle) avec, pour chacun, le
 // contrôle pour attribuer/changer son rôle directement. Un compte déjà admin
 // est affiché comme un badge fixe : impossible de le rétrograder depuis cette
-// interface, sauf pour SUPER_ADMIN_EMAIL qui peut aussi tout supprimer.
+// interface, sauf pour le compte Propriétaire (voir fetchOwnerEmail), qui peut aussi
+// tout supprimer.
 // L'RPC assign_role/delete_account refait les mêmes vérifications côté
 // serveur : ceci n'est qu'un affichage, pas la vraie barrière de sécurité.
 async function loadAccountsList() {
@@ -330,14 +330,15 @@ async function loadAccountsList() {
     return;
   }
 
-  const isSuperAdmin = currentUserEmail === SUPER_ADMIN_EMAIL;
+  const ownerEmail = await fetchOwnerEmail();
+  const isSuperAdmin = Boolean(ownerEmail) && currentUserEmail === ownerEmail;
 
   // Le compte principal reste toujours tout en haut et toujours admin, sans
   // bouton pour le changer (même pour lui-même) — assign_role le refuse aussi
   // côté serveur, donc ce n'est pas seulement caché à l'affichage.
   const sortedAccounts = [...data].sort((a, b) => {
-    if (a.email === SUPER_ADMIN_EMAIL) return -1;
-    if (b.email === SUPER_ADMIN_EMAIL) return 1;
+    if (a.email === ownerEmail) return -1;
+    if (b.email === ownerEmail) return 1;
     return a.email.localeCompare(b.email);
   });
 
@@ -350,12 +351,12 @@ async function loadAccountsList() {
     emailSpan.textContent = account.email;
     row.appendChild(emailSpan);
 
-    const isLockedAdmin = account.email === SUPER_ADMIN_EMAIL || (account.role === "admin" && !isSuperAdmin);
+    const isLockedAdmin = account.email === ownerEmail || (account.role === "admin" && !isSuperAdmin);
 
     if (isLockedAdmin) {
       const badge = document.createElement("span");
       badge.className = "badge";
-      badge.textContent = account.email === SUPER_ADMIN_EMAIL ? "Propriétaire" : "Admin";
+      badge.textContent = account.email === ownerEmail ? "Propriétaire" : "Admin";
       row.appendChild(badge);
     } else {
       if (!account.role) {
