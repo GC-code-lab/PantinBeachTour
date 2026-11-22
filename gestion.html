@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestion du tournoi — Sand System Tournament</title>
-  <link rel="stylesheet" href="css/style.css?v=69">
+  <link rel="stylesheet" href="css/style.css?v=70">
 </head>
 <body>
   <header class="site-header">
@@ -40,6 +40,50 @@
           <button type="button" class="format-card" data-format="12-quali16">12 équipes (qualifs 16)</button>
         </div>
         <p id="format-message" class="form-message"></p>
+      </section>
+
+      <section id="timing-section" hidden>
+        <h2>Horaires</h2>
+        <p>L'ordre des matchs est fixe ; les heures sont calculées à partir de l'heure de début et de la durée d'un match (changement de terrain compris), sans pause.</p>
+        <form id="timing-form" class="form">
+          <label class="checkbox-label">
+            <input type="checkbox" id="timing-show">
+            Afficher les horaires (Ordre des matchs, Suivi d'équipe)
+          </label>
+
+          <div id="timing-fields">
+            <div class="timing-grid">
+              <div id="timing-saturday-field">
+                <label for="timing-saturday">Début samedi</label>
+                <input type="time" id="timing-saturday" required>
+              </div>
+              <div>
+                <label for="timing-sunday" id="timing-sunday-label">Début dimanche</label>
+                <input type="time" id="timing-sunday" required>
+              </div>
+            </div>
+
+            <div class="timing-grid">
+              <div>
+                <label for="timing-1x21">1 set à 21 (min)</label>
+                <input type="number" id="timing-1x21" min="5" max="240" step="5" required>
+              </div>
+              <div>
+                <label for="timing-2x15">2 sets à 15 (min)</label>
+                <input type="number" id="timing-2x15" min="5" max="240" step="5" required>
+              </div>
+              <div id="timing-2x21-field">
+                <label for="timing-2x21">2 sets à 21 (min)</label>
+                <input type="number" id="timing-2x21" min="5" max="240" step="5" required>
+              </div>
+            </div>
+
+            <p id="timing-summary" class="timing-summary"></p>
+          </div>
+
+          <button type="submit" class="button">Enregistrer les horaires</button>
+        </form>
+        <p id="timing-message" class="form-message"></p>
       </section>
     </div>
 
@@ -271,8 +315,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
   <script src="js/supabaseClient.js?v=1"></script>
-  <script src="js/tournoi-commun.js?v=2"></script>
+  <script src="js/tournoi-commun.js?v=4"></script>
   <script src="js/nav.js?v=6"></script>
-  <script src="js/gestion.js?v=74"></script>
+  <script src="js/gestion.js?v=75"></script>
 </body>
 </html>

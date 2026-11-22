@@ -11,34 +11,40 @@ categoryButtons.forEach((button) => {
   });
 });
 
-async function loadPools() {
+// `silent` (rafraîchissement automatique) : en cas d'erreur réseau, on garde
+// l'affichage actuel. Si la catégorie a changé pendant le chargement, le résultat
+// (devenu obsolète) est ignoré.
+async function loadPools({ silent = false } = {}) {
+  const category = currentCategory;
   const [
     { data: pools, error: poolsError },
     { data: teams, error: teamsError },
     { data: matches, error: matchesError },
   ] = await Promise.all([
-    supabaseClient.from("pools").select("*").eq("category", currentCategory).order("label"),
+    supabaseClient.from("pools").select("*").eq("category", category).order("label"),
     supabaseClient
       .from("teams")
       .select("*")
-      .eq("category", currentCategory)
+      .eq("category", category)
       .order("seed", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true }),
     supabaseClient
       .from("matches")
       .select("*, sets(*)")
       .eq("phase", "poule")
-      .eq("category", currentCategory)
+      .eq("category", category)
       .order("id", { ascending: true }),
   ]);
 
+  if (category !== currentCategory) return;
   if (poolsError || teamsError || matchesError) {
-    poolsList.textContent = "Erreur de chargement des poules.";
+    if (!silent) poolsList.textContent = "Erreur de chargement des poules.";
     return;
   }
 
   if (pools.length === 0) {
     const format = await fetchTournamentFormat();
+    if (category !== currentCategory) return;
     if (format === "12-quali16" && teams.length >= 24) {
       renderMaindrawPreview(teams);
       return;
@@ -216,7 +222,8 @@ function renderPools(pools, teams, matches) {
     }
     card.appendChild(list);
 
-    const matches1 = createCollapsibleSection("Matchs et résultats");
+    const sectionKey = `poule-${pool.category}-${pool.label}`;
+    const matches1 = createCollapsibleSection("Matchs et résultats", `${sectionKey}-matchs`);
     if (poolMatches.length === 0) {
       const matchesNote = document.createElement("p");
       matchesNote.className = "form-message";
@@ -229,7 +236,7 @@ function renderPools(pools, teams, matches) {
     }
     card.appendChild(matches1.section);
 
-    const standings = createCollapsibleSection("Classement");
+    const standings = createCollapsibleSection("Classement", `${sectionKey}-classement`);
     const standingsRows = computePoolStandings(pool, teamsInPool, poolMatches, seedRankByTeamId);
     if (standingsRows.length === 0) {
       const standingsNote = document.createElement("p");
@@ -279,3 +286,4 @@ function renderMatchRow(match, teamsById) {
 }
 
 loadPools();
+onAutoRefresh(loadPools);

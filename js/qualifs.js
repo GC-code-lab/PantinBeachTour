@@ -133,14 +133,15 @@ function renderPoules(teamsById, pouleMatches) {
     });
     card.appendChild(list);
 
-    const matchesSection = createCollapsibleSection("Matchs et résultats");
+    const sectionKey = `qualif-${currentCategory}-${letter}`;
+    const matchesSection = createCollapsibleSection("Matchs et résultats", `${sectionKey}-matchs`);
     [r1a, r1b, r2w, r2l].forEach((match) => {
       if (!match) return;
       matchesSection.content.appendChild(renderMatchRow(match, teamsById));
     });
     card.appendChild(matchesSection.section);
 
-    const standingsSection = createCollapsibleSection("Classement");
+    const standingsSection = createCollapsibleSection("Classement", `${sectionKey}-classement`);
     const standingIds = computeBresilienneStandings(letter, bySlot);
     const standings = standingIds && standingIds.map((id) => teamsById.get(id));
     if (!standings) {
@@ -334,14 +335,16 @@ function renderQualified(teamsById, barrage2Matches) {
   qualifiedList.appendChild(grid);
 }
 
-async function loadQualifs() {
+async function loadQualifs({ silent = false } = {}) {
+  const category = currentCategory;
   const [{ data: teams, error: teamsError }, { data: matches, error: matchesError }] = await Promise.all([
-    supabaseClient.from("teams").select("*").eq("category", currentCategory),
-    supabaseClient.from("matches").select("*, sets(*)").eq("category", currentCategory).in("phase", PHASES_QUALIF),
+    supabaseClient.from("teams").select("*").eq("category", category),
+    supabaseClient.from("matches").select("*, sets(*)").eq("category", category).in("phase", PHASES_QUALIF),
   ]);
 
+  if (category !== currentCategory) return;
   if (teamsError || matchesError) {
-    poolsList.textContent = "Erreur de chargement des qualifications.";
+    if (!silent) poolsList.textContent = "Erreur de chargement des qualifications.";
     return;
   }
 
@@ -351,8 +354,9 @@ async function loadQualifs() {
   const barrage2Matches = matches.filter((m) => m.phase === "qualif_barrage2");
 
   renderPoules(teamsById, pouleMatches);
-  renderBarrages(teamsById, barrage1Matches, barrage2Matches);
+  preserveHorizontalScroll(barragesList, () => renderBarrages(teamsById, barrage1Matches, barrage2Matches));
   renderQualified(teamsById, barrage2Matches);
 }
 
 loadQualifs();
+onAutoRefresh(loadQualifs);

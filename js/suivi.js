@@ -119,9 +119,12 @@ async function selectTeam(team) {
 
 // --- Chargement + calcul de la timeline d'une équipe ---
 
-async function loadTeamTimeline(team) {
+// `silent` (rafraîchissement automatique) : pas de "Chargement…", et en cas d'erreur
+// réseau on garde l'affichage actuel. Si une autre équipe a été choisie entre-temps,
+// le résultat (devenu obsolète) est ignoré.
+async function loadTeamTimeline(team, { silent = false } = {}) {
   trackingSection.hidden = false;
-  trackingSection.innerHTML = "Chargement…";
+  if (!silent) trackingSection.innerHTML = "Chargement…";
 
   const [
     { data: teams, error: teamsError },
@@ -133,8 +136,9 @@ async function loadTeamTimeline(team) {
     supabaseClient.from("matches").select("*, sets(*)").eq("category", team.category),
   ]);
 
+  if (team !== selectedTeam) return;
   if (teamsError || poolsError || matchesError) {
-    trackingSection.textContent = "Erreur de chargement.";
+    if (!silent) trackingSection.textContent = "Erreur de chargement.";
     return;
   }
 
@@ -149,53 +153,35 @@ async function loadTeamTimeline(team) {
       poolMatchesByPoolId.get(m.pool_id).push(m);
     });
 
-  function resolveMainDrawPool(match) {
-    const pool = pools.find((p) => p.id === match.pool_id);
-    if (!pool) return null;
-    const sorted = poolMatchesByPoolId.get(pool.id) || [];
-    const roundIndex = sorted.indexOf(match);
-    if (roundIndex === -1) return null;
-
-    for (const entry of MAINDRAW_SCHEDULE) {
-      if (entry.kind !== "poolPair" || entry.round !== roundIndex) continue;
-      const idx = entry.pools.indexOf(pool.label);
-      if (idx === -1) continue;
-      return { time: entry.time, day: "maindraw", terrain: GENDER_TERRAINS[team.category][idx], label: pool.label };
-    }
-    return null;
-  }
-
-  function resolveBySlot(slot) {
-    for (const entry of MAINDRAW_SCHEDULE) {
-      if (entry.kind === "slotPair") {
-        const idx = entry.slots.indexOf(slot);
-        if (idx !== -1) {
-          return { time: entry.time, day: "maindraw", terrain: GENDER_TERRAINS[team.category][idx], label: slotLabel(slot) };
-        }
-      }
-    }
-    for (const entry of QUALIF_SCHEDULE) {
-      if (entry.kind === "slotPair") {
-        const idx = entry.slots.indexOf(slot);
-        if (idx !== -1) {
-          return { time: entry.time, day: "qualif", terrain: GENDER_TERRAINS[team.category][idx], label: slotLabel(slot) };
-        }
-      }
-      if (entry.kind === "poolRound") {
-        const slots = qualifRoundSlots(entry.poolLetter, entry.round);
-        const idx = slots.indexOf(slot);
-        if (idx !== -1) {
-          return { time: entry.time, day: "qualif", terrain: GENDER_TERRAINS[team.category][idx], label: slotLabel(slot) };
-        }
-      }
-    }
-    return null;
-  }
+  // Index "case du planning" -> horaire/terrain, construit depuis les plannings
+  // partagés (js/tournoi-commun.js) : clé "pool:<poule>:<rang du match>" pour un
+  // match de poule du Maindraw, "slot:<slot>" pour un match à slot fixe.
+  const terrains = GENDER_TERRAINS[team.category];
+  const scheduleIndex = new Map();
+  [
+    ["qualif", schedules.qualif],
+    ["maindraw", schedules.maindraw],
+  ].forEach(([day, rows]) => {
+    rows.forEach((row) => {
+      [0, 1].forEach((terrainIndex) => {
+        const cell = scheduleCell(row, terrainIndex);
+        const key = cell.poolLabel ? `pool:${cell.poolLabel}:${cell.matchIndex}` : `slot:${cell.slot}`;
+        scheduleIndex.set(key, { time: row.time, order: row.order, day, terrain: terrains[terrainIndex] });
+      });
+    });
+  });
 
   function resolveSchedule(match) {
-    if (match.phase === "poule") return resolveMainDrawPool(match);
-    if (match.slot) return resolveBySlot(match.slot);
-    return null;
+    if (match.phase === "poule") {
+      const pool = pools.find((p) => p.id === match.pool_id);
+      if (!pool) return null;
+      const index = (poolMatchesByPoolId.get(pool.id) || []).indexOf(match);
+      const entry = scheduleIndex.get(`pool:${pool.label}:${index}`);
+      return entry ? { ...entry, label: pool.label } : null;
+    }
+    if (!match.slot) return null;
+    const entry = scheduleIndex.get(`slot:${match.slot}`);
+    return entry ? { ...entry, label: slotLabel(match.slot) } : null;
   }
 
   const confirmed = matches
@@ -203,24 +189,14 @@ async function loadTeamTimeline(team) {
     .map((m) => ({ match: m, schedule: resolveSchedule(m) }))
     .filter((row) => row.schedule);
 
-  // Samedi (qualif) toujours avant dimanche (Main-draw), peu importe l'heure brute —
-  // sans ça, un match de qualif à 9h se retrouverait trié après un match de Main-draw
-  // à 9h30 du lendemain.
+  // Samedi (qualif) avant dimanche (Main-draw), puis ordre de passage dans la journée.
   confirmed.sort((a, b) => scheduleSortKey(a.schedule) - scheduleSortKey(b.schedule));
 
   renderTimeline(team, teamsById, confirmed);
 }
 
-function timeToMinutes(timeStr) {
-  const [h, m] = timeStr.split("h");
-  return Number(h) * 60 + Number(m || 0);
-}
-
-// Clé de tri chronologique sur les 2 jours : samedi (qualif) avant dimanche (Main-draw),
-// quelle que soit l'heure brute de chacun.
 function scheduleSortKey(schedule) {
-  const dayOffset = schedule.day === "qualif" ? 0 : 1;
-  return dayOffset * 10000 + timeToMinutes(schedule.time);
+  return (schedule.day === "qualif" ? 0 : 1000) + schedule.order;
 }
 
 // --- Rendu ---
@@ -270,10 +246,14 @@ function renderMatchCard(team, teamsById, match, schedule) {
   const card = document.createElement("div");
   card.className = match.status === "termine" ? "match-row match-row-done" : "match-row";
 
-  const timeTag = document.createElement("span");
-  timeTag.className = "match-time";
-  timeTag.textContent = schedule.time;
-  card.appendChild(timeTag);
+  // Horaires masqués par l'admin : on indique juste le jour s'il y en a deux.
+  const timeText = schedule.time || (schedules.qualif.length > 0 ? (schedule.day === "qualif" ? "Samedi" : "Dimanche") : "");
+  if (timeText) {
+    const timeTag = document.createElement("span");
+    timeTag.className = "match-time";
+    timeTag.textContent = timeText;
+    card.appendChild(timeTag);
+  }
 
   const terrainTag = document.createElement("a");
   terrainTag.className = "match-order-tag match-order-link";
@@ -313,9 +293,21 @@ function renderMatchCard(team, teamsById, match, schedule) {
   return card;
 }
 
+// Plannings avec horaires calculés (voir js/tournoi-commun.js), lus une fois au chargement.
+let schedules = { qualif: [], maindraw: [] };
+
 async function init() {
-  const { data, error } = await supabaseClient.from("teams").select("*");
+  const [{ data, error }, settings] = await Promise.all([
+    supabaseClient.from("teams").select("*"),
+    fetchTournamentSettings(),
+  ]);
   if (!error && data) allTeams = data;
+  schedules = buildSchedules(settings);
 }
 
 init();
+
+// Rafraîchissement automatique : seulement si une équipe est affichée.
+onAutoRefresh(async (options) => {
+  if (selectedTeam) await loadTeamTimeline(selectedTeam, options);
+});

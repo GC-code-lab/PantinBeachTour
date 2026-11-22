@@ -53,22 +53,24 @@ function renderSection(title, teams, startRank) {
   return section;
 }
 
-async function loadEquipes() {
-  content.innerHTML = "Chargement…";
+async function loadEquipes({ silent = false } = {}) {
+  const category = currentCategory;
+  if (!silent) content.innerHTML = "Chargement…";
 
   const [format, { data: teams, error }] = await Promise.all([
     fetchTournamentFormat(),
     supabaseClient
       .from("teams")
       .select("*")
-      .eq("category", currentCategory)
+      .eq("category", category)
       .order("seed", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: true }),
   ]);
   const isQuali16 = format === "12-quali16";
 
+  if (category !== currentCategory) return;
   if (error) {
-    content.textContent = "Erreur de chargement des équipes.";
+    if (!silent) content.textContent = "Erreur de chargement des équipes.";
     return;
   }
 
@@ -91,3 +93,4 @@ async function loadEquipes() {
 }
 
 loadEquipes();
+onAutoRefresh(loadEquipes);

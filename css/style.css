@@ -306,6 +306,45 @@ section {
   align-self: flex-start;
 }
 
+.form .checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--color-text);
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.form .checkbox-label input {
+  width: 1.1rem;
+  height: 1.1rem;
+  padding: 0;
+  margin: 0;
+}
+
+/* Champs "Horaires" : chaque champ = libellé au-dessus de sa case, en grille qui
+   passe tout seul de 3 colonnes à 1 selon la largeur d'écran. */
+.timing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0 1rem;
+}
+
+.timing-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.timing-grid > div[hidden] {
+  display: none;
+}
+
+.timing-summary {
+  margin-top: 1rem;
+  color: var(--color-text-muted);
+}
+
 .category-toggle {
   display: flex;
   gap: 0.5rem;

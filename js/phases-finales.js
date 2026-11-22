@@ -15,22 +15,26 @@ bracketCategoryButtons.forEach((button) => {
   });
 });
 
-async function loadBracket() {
+async function loadBracket({ silent = false } = {}) {
+  const category = currentBracketCategory;
   const [{ data: teams, error: teamsError }, { data: matches, error: matchesError }] = await Promise.all([
-    supabaseClient.from("teams").select("*").eq("category", currentBracketCategory),
+    supabaseClient.from("teams").select("*").eq("category", category),
     supabaseClient
       .from("matches")
       .select("*, sets(*)")
-      .eq("category", currentBracketCategory)
+      .eq("category", category)
       .in("phase", PHASES_MAINDRAW_BRACKET),
   ]);
 
+  if (category !== currentBracketCategory) return;
   if (teamsError || matchesError) {
-    bracketContainer.textContent = "Erreur de chargement du tableau.";
+    if (!silent) bracketContainer.textContent = "Erreur de chargement du tableau.";
     return;
   }
 
-  renderBracket(bracketContainer, teams, matches);
+  // Garde le défilement horizontal du tableau (téléphone) d'un rafraîchissement à l'autre.
+  preserveHorizontalScroll(bracketContainer, () => renderBracket(bracketContainer, teams, matches));
 }
 
 loadBracket();
+onAutoRefresh(loadBracket);

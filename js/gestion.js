@@ -230,14 +230,16 @@ supabaseClient.auth.onAuthStateChange(async (_event, session) => {
 const formatButtons = document.querySelectorAll(".format-card");
 const formatMessage = document.getElementById("format-message");
 let currentFormat = null;
+// Formule + réglages d'horaires (ligne unique de tournament_formats, complétée par
+// les valeurs par défaut de TIMING_DEFAULTS — voir js/tournoi-commun.js).
+let tournamentSettings = { ...TIMING_DEFAULTS, format: null };
 
 async function loadTournamentFormats() {
-  const { data, error } = await supabaseClient.from("tournament_formats").select("*").maybeSingle();
-  if (error || !data) return;
-
-  currentFormat = data.format;
+  tournamentSettings = await fetchTournamentSettings();
+  currentFormat = tournamentSettings.format;
   renderFormatButtons();
   applyTabVisibility();
+  renderTimingForm();
 }
 
 function renderFormatButtons() {
@@ -298,12 +300,99 @@ formatButtons.forEach((button) => {
     }
 
     currentFormat = format;
+    tournamentSettings.format = format;
     renderFormatButtons();
     applyTabVisibility();
+    renderTimingForm();
     formatMessage.textContent = "Formule enregistrée.";
     formatMessage.style.color = "var(--color-ocean-dark)";
     loadAdminData();
   });
+});
+
+// --- Horaires (onglet Formule) ---
+// Heure de début de chaque journée + durée d'un match selon son format. Les heures
+// affichées dans "Ordre des matchs" et "Suivi d'équipe" en sont calculées (voir
+// buildSchedules dans js/tournoi-commun.js). Case décochée : ordre de passage seul.
+const timingSection = document.getElementById("timing-section");
+const timingForm = document.getElementById("timing-form");
+const timingFields = document.getElementById("timing-fields");
+const timingMessage = document.getElementById("timing-message");
+const timingSummary = document.getElementById("timing-summary");
+const timingInputs = {
+  show_timing: document.getElementById("timing-show"),
+  saturday_start: document.getElementById("timing-saturday"),
+  sunday_start: document.getElementById("timing-sunday"),
+  duration_1x21: document.getElementById("timing-1x21"),
+  duration_2x15: document.getElementById("timing-2x15"),
+  duration_2x21: document.getElementById("timing-2x21"),
+};
+
+// "9:00" / "09:00:00" -> "09:00" (format attendu par <input type="time">)
+function toTimeInputValue(value) {
+  const minutes = parseClock(value);
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+function readTimingForm() {
+  return {
+    show_timing: timingInputs.show_timing.checked,
+    saturday_start: timingInputs.saturday_start.value,
+    sunday_start: timingInputs.sunday_start.value,
+    duration_1x21: Number(timingInputs.duration_1x21.value),
+    duration_2x15: Number(timingInputs.duration_2x15.value),
+    duration_2x21: Number(timingInputs.duration_2x21.value),
+  };
+}
+
+// Champs utiles selon la formule + fin de journée prévue, recalculée à chaque frappe.
+function updateTimingPreview() {
+  const isQuali16 = currentFormat === "12-quali16";
+  const values = readTimingForm();
+  timingFields.hidden = !values.show_timing;
+  document.getElementById("timing-saturday-field").hidden = !isQuali16;
+  // En formule "12-quali16", aucun match ne se joue en 2 sets à 21.
+  document.getElementById("timing-2x21-field").hidden = isQuali16;
+  document.getElementById("timing-sunday-label").textContent = isQuali16 ? "Début dimanche" : "Début du tournoi";
+
+  const schedules = buildSchedules({ ...values, show_timing: true, format: currentFormat });
+  const parts = [];
+  if (isQuali16) parts.push(`samedi vers ${schedules.qualif.endTime}`);
+  parts.push(`${isQuali16 ? "dimanche " : ""}vers ${schedules.maindraw.endTime}`);
+  timingSummary.textContent = `Fin prévue : ${parts.join(" · ")}.`;
+}
+
+function renderTimingForm() {
+  timingSection.hidden = currentFormat === null;
+  if (currentFormat === null) return;
+  timingInputs.show_timing.checked = Boolean(tournamentSettings.show_timing);
+  timingInputs.saturday_start.value = toTimeInputValue(tournamentSettings.saturday_start);
+  timingInputs.sunday_start.value = toTimeInputValue(tournamentSettings.sunday_start);
+  ["duration_1x21", "duration_2x15", "duration_2x21"].forEach((key) => {
+    timingInputs[key].value = tournamentSettings[key];
+  });
+  updateTimingPreview();
+}
+
+Object.values(timingInputs).forEach((input) => input.addEventListener("input", updateTimingPreview));
+
+timingForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const values = readTimingForm();
+
+  const { error } = await supabaseClient.from("tournament_formats").update(values).eq("id", 1);
+
+  if (error) {
+    const missingColumns = /column/i.test(error.message);
+    timingMessage.textContent =
+      "Erreur : " + error.message + (missingColumns ? " — la requête SQL des horaires a-t-elle été lancée dans Supabase ?" : "");
+    timingMessage.style.color = "var(--color-coral)";
+    return;
+  }
+
+  tournamentSettings = { ...tournamentSettings, ...values };
+  timingMessage.textContent = "Horaires enregistrés.";
+  timingMessage.style.color = "var(--color-ocean-dark)";
 });
 
 const accountsList = document.getElementById("accounts-list");
