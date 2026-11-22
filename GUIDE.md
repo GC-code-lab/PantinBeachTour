@@ -43,7 +43,7 @@ Ordre des liens dans le bandeau du haut : **Équipes · Qualifs** *(si formule a
 | **Équipes** | `equipes.html` | La liste des équipes inscrites dans la catégorie, avec leur **numéro de tête de série** (#1, #2...) et leurs **points**. Pour la formule "12 équipes, qualifs 16", la liste est coupée en deux : **Direct Maindraw** (les 8 premières têtes de série) et **Qualifications** (les 16 suivantes) — même répartition que côté admin. |
 | **Qualifs** | `qualifs.html` | *Visible uniquement si la formule active du tournoi comporte des qualifications (voir section 4bis)* — deux sous-onglets **Poules** et **Barrages** : les 4 poules de qualification ("Poule Qualif A" à "D") avec leurs matchs/scores et leur classement 1-2-3-4, et un tableau visuel type bracket pour les 8 barrages de qualification. En bas de page, un bloc **"Les qualifiés pour le Main Draw"** affiche une carte ✅ par équipe qualifiée, au fur et à mesure que les Barrages 5 à 8 sont joués. Apparaît dans le bandeau juste après "Équipes". |
 | **Main Draw** (page d'accueil) | `index.html` | Deux sous-onglets : **Poule** (les 4 poules A/B/C/D du tournoi principal, avec pour chacune la liste des équipes, puis deux blocs repliés par défaut : **"Matchs et résultats"** et **"Classement"** — rang, victoires, défaites, ratio de points, tête de série) et **Phases Finales** (le tableau à élimination directe en dessin : barrages → quarts → demies → finale + petite finale, avec un podium en dessous une fois le tournoi terminé) — toujours le tableau du tournoi principal, identique quelle que soit la formule choisie. *(Avant le 09/10/2026, Poules et Phases finales étaient deux pages séparées.)* |
-| **Ordre des matchs** | `ordre-des-matchs.html` | L'ordre de passage des matchs **terrain par terrain**, avec l'horaire prévu (voir section 9) — pratique à afficher/imprimer le jour J pour savoir qui joue où et dans quel ordre. Pour la formule "12 équipes, qualifs 16", deux onglets apparaissent en haut : **Qualif (Samedi)** et **Main-draw (Dimanche)**. |
+| **Ordre des matchs** | `ordre-des-matchs.html` | L'ordre de passage des matchs **terrain par terrain**, avec l'horaire prévu (voir section 9) — pratique à afficher/imprimer le jour J pour savoir qui joue où et dans quel ordre. Quand le tournoi dure deux jours, deux onglets apparaissent en haut : **Qualif (Samedi)** / **Main-draw (Dimanche)** en formule "12 équipes, qualifs 16", ou par exemple **Femmes (Samedi)** / **Hommes (Dimanche)** avec l'option "un jour par catégorie". |
 | **Suivi d'équipe** | `suivi.html` | Un champ de recherche : on tape un nom ou prénom de joueur (2 lettres minimum, accents ignorés), on choisit sa paire dans la liste, et la page affiche **tous ses matchs dans l'ordre chronologique** (samedi avant dimanche) : horaire, terrain, adversaire, score, et un badge **Gagné / Perdu / À venir**. Chaque match est un lien qui ouvre "Ordre des matchs" directement sur la bonne ligne (dépliée et surlignée). Si l'adversaire n'est pas encore connu, la page dit d'où il viendra (ex : "vs vainqueur de Barrage 2"), et ce texte est lui aussi cliquable. Seuls les matchs qui existent déjà en base apparaissent (pas de projection des tours suivants). |
 | **Palmarès** | `palmares.html` | La liste des tournois passés, chacun dépliable pour revoir son tableau des phases finales avec tous les scores (voir section 5) |
 
@@ -71,7 +71,7 @@ Le site est pensé pour être consulté sur téléphone. Seule exception : le ta
 Une fois sur `gestion.html` (via l'icône ⚙ → "Gestion du tournoi"), il y a 4 onglets. **"Formule"** est toujours visible pour un admin ; les 3 autres n'apparaissent **qu'une fois une formule choisie** pour le tournoi (voir section 4bis). Un scorer ne voit que "Matchs & Résultats" (voir section 6). Chaque onglet (sauf Formule) a son propre sélecteur Hommes/Femmes, partagé entre eux :
 
 ### Onglet "Formule"
-Voir section 4bis — c'est le premier onglet, et le passage obligé avant tout le reste. Une fois la formule choisie, un bloc **"Horaires"** apparaît en dessous pour régler l'heure de début et la durée des matchs, ou masquer les horaires (voir section 9).
+Voir section 4bis — c'est le premier onglet, et le passage obligé avant tout le reste. En formule 12 ou 16, un choix **"Jours"** apparaît sous les formules (Hommes et Femmes le même jour, ou un jour par catégorie, voir section 4bis). Une fois la formule choisie, un bloc **"Horaires"** apparaît en dessous pour régler l'heure de début et la durée des matchs, ou masquer les horaires (voir section 9).
 
 ### Onglet "Inscription des équipes"
 Le formulaire pour inscrire une équipe : Nom/Prénom des deux joueurs (Nom mis en MAJUSCULES, Prénom avec Majuscule initiale, automatiquement), la catégorie (Hommes/Femmes), et les **points de la paire** (un seul nombre pour l'équipe, pas par joueur — son classement de référence). En dessous, la liste des équipes déjà inscrites — **triée par points décroissants**, avec le nombre de points affiché à côté de chaque équipe — et une case à cocher pour en supprimer plusieurs d'un coup.
@@ -118,6 +118,12 @@ Trois formules sont disponibles, sous forme de gros blocs à cliquer (même tail
 - **12 équipes (qualifs 16)** — voir plus bas
 
 La formule est **une seule pour tout le tournoi**, Hommes et Femmes confondus (pas une par catégorie).
+
+**Jours (formules "12 équipes" et "16 équipes")** : juste sous les formules, deux choix :
+- **Hommes et Femmes le même jour** (par défaut) : chaque catégorie joue sur ses 2 terrains, en même temps que l'autre ;
+- **Un jour par catégorie** : une catégorie joue le samedi, l'autre le dimanche, et chacune a **les 4 terrains** pour sa journée. Un menu choisit qui joue le samedi (**Femmes** par défaut).
+
+Ce choix est enregistré dès qu'on clique, peut être changé à tout moment (même tournoi commencé) et ne touche à aucune poule ni aucun match : il change seulement les pages "Ordre des matchs" et "Suivi d'équipe" (jours, heures, terrains — voir section 9). Il n'existe pas en formule "12 équipes (qualifs 16)", dont le samedi est déjà pris par les qualifs des deux catégories.
 
 **Changer de formule** :
 - **Si des scores ont déjà été saisis** (n'importe quelle catégorie, n'importe quelle phase), le changement est **bloqué** — il faut d'abord terminer ou nettoyer le tournoi en cours.
@@ -228,7 +234,7 @@ Si tu vas dans Supabase → Table Editor, tu verras ces tables :
 - **`profiles`** : qui a quel rôle (admin/scorer) — lié aux comptes de connexion
 - **`signup_codes`** : les deux codes d'inscription automatique (admin/scorer), modifiables depuis l'onglet Connexion
 - **`tournament_archives`** : les tournois sauvegardés dans le Palmarès (nom, mois, année, et une colonne `data` qui contient une copie complète et figée des équipes + du tableau des phases finales des deux catégories, au format JSON) — voir section 5
-- **`tournament_formats`** : une seule ligne (`id = 1`), avec la formule active du tournoi en cours (`format` = `"12"`, `"16"`, ou `"12-quali16"`, voir section 4bis) et les réglages d'horaires (`show_timing`, `saturday_start`, `sunday_start`, `duration_1x21`, `duration_2x15`, `duration_2x21`, voir section 9). Lisible par tout le monde (public), modifiable uniquement par un admin.
+- **`tournament_formats`** : une seule ligne (`id = 1`), avec la formule active du tournoi en cours (`format` = `"12"`, `"16"`, ou `"12-quali16"`, voir section 4bis) les réglages d'horaires (`show_timing`, `saturday_start`, `sunday_start`, `duration_1x21`, `duration_2x15`, `duration_2x21`, voir section 9) et le choix des jours (`split_days` = un jour par catégorie, `saturday_category` = `"Femmes"` ou `"Hommes"`, la catégorie du samedi, voir section 4bis). Lisible par tout le monde (public), modifiable uniquement par un admin.
 - **`site_feedback`** : les messages de la boîte à idées "Amélioration du site" (`message`, `author_email`, date). Un admin ou un scorer peut en ajouter ; seuls les admins peuvent les lire et les supprimer (règles RLS côté Supabase).
 
 Fonctions SQL (RPC) appelées par le site : `list_all_accounts`, `assign_role`, `remove_role`, `delete_account`, `claim_role_with_code` (code d'inscription), `delete_tournament_archive`, `owner_email` (renvoie l'email du compte Propriétaire, seulement à un admin connecté). Plus le déclencheur `auto_confirm_email_trigger` (voir section 12). Le code SQL lui-même n'est **pas** dans le dépôt GitHub : il n'existe que dans Supabase.
@@ -256,13 +262,16 @@ Fonctions SQL (RPC) appelées par le site : `list_all_accounts`, `assign_role`, 
 
 La page publique **Ordre des matchs** (`ordre-des-matchs.html`, fichier `js/ordre-des-matchs.js`) répond à une question très concrète le jour J : *"sur quel terrain, à quelle heure, et dans quel ordre je joue ?"*. Elle affiche les 4 terrains côte à côte, chacun avec sa liste de matchs dans l'ordre de passage, et (si l'admin l'a activé) **l'horaire prévu affiché en petit** à côté de chaque match. Ces horaires sont prévus à l'avance : si le tournoi prend du retard, ils ne bougent pas.
 
-**Formule "12 équipes, qualifs 16"** : deux onglets apparaissent en haut de la page — **"Qualif (Samedi)"** et **"Main-draw (Dimanche)"** — pour séparer les deux journées, chacune avec son propre planning (voir plus bas). Sans cette formule, les onglets n'apparaissent pas et la page garde son comportement habituel (juste le Main-draw, sans onglet).
+**Les journées** (calculées par `buildSchedules` dans `js/tournoi-commun.js`) :
+- formule **"12 équipes, qualifs 16"** : deux onglets, **"Qualif (Samedi)"** et **"Main-draw (Dimanche)"**, les deux catégories ensemble chaque jour ;
+- formules **12 / 16 avec "un jour par catégorie"** : deux onglets, par exemple **"Femmes (Samedi)"** et **"Hommes (Dimanche)"** ; chaque journée montre les 4 terrains, tous pour la même catégorie (voir "Un jour par catégorie : 4 terrains" plus bas) ;
+- sinon : une seule journée, pas d'onglet.
 
 ### Répartition des terrains par catégorie
 
 Chaque terrain affiche son **Programme** (bloc repliable) : matchs de poule puis phases finales, dans l'ordre horaire.
 
-Il y a 4 terrains, dédiés en dur à une catégorie chacun :
+Quand Hommes et Femmes jouent le même jour, chaque terrain est dédié à une catégorie :
 
 | Terrain | Catégorie |
 |---|---|
@@ -273,15 +282,17 @@ Il y a 4 terrains, dédiés en dur à une catégorie chacun :
 
 Chaque catégorie utilise donc 2 terrains en parallèle, indépendamment de l'autre catégorie — mais suit le **même planning** qu'elle (défini une seule fois dans `js/tournoi-commun.js` : `maindrawScheduleRows`/`qualifScheduleRows`, appliqué identiquement aux deux catégories sur leurs propres terrains, et réutilisé par "Suivi d'équipe").
 
+Avec l'option "un jour par catégorie", la catégorie du jour a les 4 terrains (voir plus bas).
+
 ### Les horaires : calculés, et réglables par l'admin
 
 L'**ordre** de passage est fixe (voir plus bas). Les **heures**, elles, sont calculées à partir des réglages de l'onglet **Formule → Horaires** :
 
-- **Afficher les horaires** (case à cocher) : décochée, "Ordre des matchs" et "Suivi d'équipe" n'affichent plus que l'ordre de passage, sans heure (Suivi d'équipe indique juste "Samedi"/"Dimanche" s'il y a des qualifs).
-- **Début samedi** (formule avec qualifs uniquement) et **Début dimanche** (ou "Début du tournoi" pour les formules sur une seule journée).
+- **Afficher les horaires** (case à cocher) : décochée, "Ordre des matchs" et "Suivi d'équipe" n'affichent plus que l'ordre de passage, sans heure (Suivi d'équipe indique juste "Samedi"/"Dimanche" si le tournoi dure deux jours).
+- **Début samedi** et **Début dimanche** quand le tournoi dure deux jours (avec la catégorie entre parenthèses en mode "un jour par catégorie", ex : "Début samedi (Femmes)"), sinon **Début du tournoi**.
 - **Durée d'un match**, selon son format, changement de terrain compris : **1 set à 21** (poules du Maindraw), **2 sets à 15** (qualifs, barrages, et tout le tableau final en formule "12 équipes, qualifs 16"), **2 sets à 21** (quarts, demies, finales des formules "12" et "16" — champ masqué en formule qualifs, où il ne sert pas).
 
-Règle de calcul : chaque ligne du planning (les 2 matchs joués en même temps sur les 2 terrains d'une catégorie) commence quand la précédente se termine, **sans pause**. Le formulaire affiche en direct la **fin prévue** de chaque journée. Les réglages sont stockés dans `tournament_formats` (voir section 7) ; tant qu'ils ne sont pas enregistrés, les valeurs par défaut s'appliquent : **9h00**, **30 min** (1 set à 21), **45 min** (2 sets à 15), **60 min** (2 sets à 21).
+Règle de calcul : chaque ligne du planning (les matchs joués en même temps sur les terrains d'une catégorie) commence quand la précédente se termine, **sans pause**. Le formulaire affiche en direct la **fin prévue** de chaque journée. Les réglages sont stockés dans `tournament_formats` (voir section 7) ; tant qu'ils ne sont pas enregistrés, les valeurs par défaut s'appliquent : **9h00**, **30 min** (1 set à 21), **45 min** (2 sets à 15), **60 min** (2 sets à 21).
 
 Les heures données dans les tableaux ci-dessous correspondent à ces valeurs par défaut.
 
@@ -319,6 +330,23 @@ Une poule de 4 a 2 matchs simultanés à chaque tour (6 matchs = 3 tours de 2) :
 | 15h00 → 19h30 | Barrages (×2), quarts (×2), demies, finales — même ordre que ci-dessus |
 | *fin 20h30* | |
 
+### Un jour par catégorie : 4 terrains (formules "12" et "16")
+
+La catégorie du jour joue sur les **terrains 1 à 4**. Même ordre de matchs, mais 2 fois plus de matchs en même temps :
+
+| Heure (formule 12) | Terrain 1 | Terrain 2 | Terrain 3 | Terrain 4 |
+|---|---|---|---|---|
+| 9h00 · 9h30 · 10h00 | Poule A · Tour 1, 2, 3 | Poule B | Poule C | Poule D |
+| 10h30 | Barrage 1 | Barrage 2 | Barrage 3 | Barrage 4 |
+| 11h15 | Quart 1 | Quart 2 | Quart 3 | Quart 4 |
+| 12h15 | Demi 1 | Demi 2 | — | — |
+| 13h15 | Finale | Petite finale | — | — |
+| *fin 14h15* | | | | |
+
+En formule **16** (poules de 4, 2 matchs par tour), chaque tour se joue en 2 temps : **Poules A + B** (A sur les terrains 1-2, B sur 3-4), puis **Poules C + D** (C sur 1-2, D sur 3-4) — 6 créneaux de 30 min de 9h00 à 11h30 —, puis le tableau comme ci-dessus à partir de 12h00 : fin vers **15h45** (contre 20h30 sur 2 terrains).
+
+Dans "Suivi d'équipe", chaque match est précédé du jour ("Samedi 9h00") dès que le tournoi dure deux jours.
+
 ### Samedi — Qualifications (poules de 4, "poule brésilienne")
 
 Ici, contrairement au Main-draw, une poule de qualif (4 équipes) **a bien** 2 matchs simultanés en son sein à chaque tour (1v4+2v3, puis vainqueurs entre eux/perdants entre eux — voir section 4bis) : une seule poule occupe donc les 2 terrains de la catégorie à la fois. Planning :
@@ -341,7 +369,7 @@ Ici, contrairement au Main-draw, une poule de qualif (4 équipes) **a bien** 2 m
 
 Ordre de passage des poules de qualif : **B, D, A, C** (aux deux tours) — différent de l'ordre alphabétique, choix arbitraire pour varier l'enchaînement comme pour le Main-draw. Les barrages de qualif sont groupés par poules concernées : Barrage qualif 2 (2B-3D) et Barrage qualif 4 (2D-3B) ensemble (tous deux B/D) ; Barrage qualif 1 (2A-3C) et Barrage qualif 3 (2C-3A) ensemble (tous deux A/C) ; puis le 2e tour reprend le même regroupement (B2→B5 et B4→B7 ensemble, B1→B6 et B3→B8 ensemble) — les croisements eux-mêmes (qui affronte qui) restent ceux définis en section 4bis/8, seul le regroupement par terrain/horaire change.
 
-**Lien depuis "Suivi d'équipe"** : chaque ligne de match porte un identifiant invisible (`slot:<catégorie>:<slot>` pour les matchs à slot fixe — tableau final, poules et barrages de qualif —, `match:<id>` pour les matchs de poule du Maindraw). Une adresse du type `ordre-des-matchs.html?day=maindraw&anchor=slot:Hommes:barrage-2` ouvre le bon onglet, déplie le terrain concerné, fait défiler jusqu'au match et le surligne quelques secondes.
+**Lien depuis "Suivi d'équipe"** : chaque ligne de match porte un identifiant invisible (`slot:<catégorie>:<slot>` pour les matchs à slot fixe — tableau final, poules et barrages de qualif —, `match:<id>` pour les matchs de poule du Maindraw). Une adresse du type `ordre-des-matchs.html?day=sunday&anchor=slot:Hommes:barrage-2` (`day` = `saturday` ou `sunday` ; les anciens `qualif`/`maindraw` marchent encore) ouvre le bon onglet, déplie le terrain concerné, fait défiler jusqu'au match et le surligne quelques secondes.
 
 ---
 
@@ -382,7 +410,7 @@ Pas de framework ni d'étape de build : chaque page HTML charge, dans cet ordre 
 
 | Fichier JS | Utilisé par | Rôle |
 |---|---|---|
-| `tournoi-commun.js` | toutes les pages | **La source de vérité** : croisements du tableau (`MAINDRAW_BRACKET_ENTRANTS`, `QUALIF_BARRAGE_ENTRANTS`), propagation des vainqueurs (`BRACKET_PROGRESSION`), classement de poule (`computePoolStandings`) et de poule brésilienne, vainqueur d'un match (`matchResult`), terrains, plannings et calcul des horaires (`GENDER_TERRAINS`, `maindrawScheduleRows`, `qualifScheduleRows`, `buildSchedules`), ordre des têtes de série, lecture du compte Propriétaire (`fetchOwnerEmail`), rafraîchissement automatique des pages publiques (`onAutoRefresh`), petits outils d'affichage |
+| `tournoi-commun.js` | toutes les pages | **La source de vérité** : croisements du tableau (`MAINDRAW_BRACKET_ENTRANTS`, `QUALIF_BARRAGE_ENTRANTS`), propagation des vainqueurs (`BRACKET_PROGRESSION`), classement de poule (`computePoolStandings`) et de poule brésilienne, vainqueur d'un match (`matchResult`), terrains, plannings, journées et calcul des horaires (`GENDER_TERRAINS`, `maindrawScheduleRows`, `qualifScheduleRows`, `buildSchedules`, `scheduleDayFor`), ordre des têtes de série, lecture du compte Propriétaire (`fetchOwnerEmail`), rafraîchissement automatique des pages publiques (`onAutoRefresh`), petits outils d'affichage |
 | `gestion.js` | `gestion.html` | Tout l'admin : formule, inscriptions, import JSON, têtes de série, génération des poules/qualifs/tableau, saisie des scores, sauvegarde Palmarès, comptes/rôles, boîte à idées |
 | `login.js` | `admin.html` | Connexion et création de compte (avec code optionnel) |
 | `equipes.js` | `equipes.html` | Page Équipes |
@@ -462,3 +490,5 @@ Pas de framework ni d'étape de build : chaque page HTML charge, dans cet ordre 
 **Horaires réglables + planning de la formule 16 équipes** (20/11/2026) : les heures de "Ordre des matchs" et "Suivi d'équipe" ne sont plus écrites en dur ; elles sont **calculées** à partir d'un réglage de l'onglet Formule (heure de début de chaque journée, durée d'un match par format : 1 set à 21 / 2 sets à 15 / 2 sets à 21, sans pause), et peuvent être masquées. Décisions prises en discussion : une durée **par format de match** plutôt que par tour (conséquence acceptée : avec les valeurs par défaut, quarts/demies/finales du dimanche ne tombent plus exactement aux heures de l'ancien planning fait main, voir section 9) ; **pas de pause** ; en formule "16 équipes", chaque poule de 4 occupe les 2 terrains de sa catégorie pendant un tour, ordre A, B, C, D (jusque-là cette formule n'avait pas de planning et seuls 3 matchs sur 6 par poule apparaissaient). Correctif au passage : depuis Suivi d'équipe, le lien vers un match de **poule de qualif** ne retrouvait pas sa ligne dans Ordre des matchs.
 
 **Mise à jour automatique des pages publiques** (21/11/2026) : le jour J, un joueur garde la page ouverte sur son téléphone ; jusque-là elle ne montrait que les scores du moment où il l'avait ouverte. Deux options discutées : relecture régulière (choisie) ou "temps réel" Supabase (instantané, mais une requête SQL de plus et des connexions qui se coupent de toute façon quand le téléphone se verrouille). Pour ne pas épuiser le quota d'échange de données de Supabase (recharger toute la page toutes les 30 s sur des dizaines de téléphones aurait pu consommer plusieurs Go par jour de tournoi), la page ne pose toutes les 30 s qu'une question minuscule — le nombre de sets, de matchs, de matchs terminés et d'équipes (`fetchDataSignature`) — et ne recharge tout que si un de ces nombres a changé, ou au moins toutes les 5 minutes (une correction de score ne change aucun compteur). Rien ne tourne quand l'onglet est caché. Les blocs dépliés restent dépliés (`createCollapsibleSection` avec une clé) et le défilement horizontal des tableaux est conservé. En cas d'erreur réseau pendant un rafraîchissement, l'affichage actuel est gardé tel quel.
+
+**Un jour par catégorie** (22/11/2026) : certains tournois font jouer les Femmes un jour et les Hommes l'autre. Nouveau choix **"Jours"** dans l'onglet Formule (formules 12 et 16 seulement — en "12 équipes (qualifs 16)" le samedi est pris par les qualifs). Décisions prises en discussion : la catégorie seule sur sa journée a **les 4 terrains** (sinon une journée de formule 16 sur 2 terrains finissait vers 20h30) ; Femmes le samedi par défaut, inversable ; option proposée aussi pour la formule 12. Côté code, `buildSchedules` renvoie maintenant la liste des journées (chacune avec ses terrains et son planning) au lieu de `{qualif, maindraw}`, et les lignes de planning peuvent avoir 2 ou 4 colonnes. Correctif au passage : un élément caché (`hidden`) pouvait rester visible si le CSS lui donnait un `display` — c'est ce qui affichait les onglets "Qualif / Main-draw" même sans qualifs ; une règle générale `[hidden] { display: none !important; }` règle ça pour tout le site.

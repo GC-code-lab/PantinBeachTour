@@ -18,6 +18,12 @@
   --shadow-md: 0 6px 20px rgba(15, 23, 42, 0.08);
 }
 
+/* Un élément marqué `hidden` reste caché même si une règle lui donne un display
+   (flex, grid...) : sans ça, les onglets "Qualif / Main-draw" restaient visibles. */
+[hidden] {
+  display: none !important;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -330,6 +336,11 @@ section {
   gap: 0 1rem;
 }
 
+/* Heures de début : libellés plus longs ("Début samedi (Femmes)"). */
+.timing-grid.timing-starts {
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+}
+
 .timing-grid > div {
   display: flex;
   flex-direction: column;
@@ -343,6 +354,21 @@ section {
 .timing-summary {
   margin-top: 1rem;
   color: var(--color-text-muted);
+}
+
+.days-section {
+  margin-top: 1.5rem;
+}
+
+.days-split-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+}
+
+.days-split-fields select {
+  width: auto;
 }
 
 .category-toggle {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ordre des matchs — Sand System Tournament</title>
-  <link rel="stylesheet" href="css/style.css?v=70">
+  <link rel="stylesheet" href="css/style.css?v=71">
 </head>
 <body>
   <header class="site-header">
@@ -26,18 +26,18 @@
     <h1>Ordre des matchs</h1>
 
     <div class="tabs" id="day-tabs" hidden>
-      <button type="button" class="tab-button" data-day="qualif">Qualif (Samedi)</button>
-      <button type="button" class="tab-button active" data-day="maindraw">Main-draw (Dimanche)</button>
+      <button type="button" class="tab-button" data-day="saturday">Samedi</button>
+      <button type="button" class="tab-button active" data-day="sunday">Dimanche</button>
     </div>
 
-    <div id="day-qualif" class="day-panel" hidden>
-      <p id="qualif-courts-info" class="form-message"></p>
-      <div id="qualif-courts-list" class="courts-list"></div>
+    <div id="day-saturday" class="day-panel" hidden>
+      <p id="courts-info-saturday" class="form-message"></p>
+      <div id="courts-list-saturday" class="courts-list"></div>
     </div>
 
-    <div id="day-maindraw" class="day-panel">
-      <p id="courts-info" class="form-message"></p>
-      <div id="courts-list" class="courts-list"></div>
+    <div id="day-sunday" class="day-panel">
+      <p id="courts-info-sunday" class="form-message"></p>
+      <div id="courts-list-sunday" class="courts-list"></div>
     </div>
   </main>
 
@@ -49,8 +49,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
   <script src="js/supabaseClient.js?v=1"></script>
-  <script src="js/tournoi-commun.js?v=4"></script>
+  <script src="js/tournoi-commun.js?v=5"></script>
   <script src="js/nav.js?v=6"></script>
-  <script src="js/ordre-des-matchs.js?v=28"></script>
+  <script src="js/ordre-des-matchs.js?v=29"></script>
 </body>
 </html>

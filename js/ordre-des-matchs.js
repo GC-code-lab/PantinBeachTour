@@ -1,38 +1,39 @@
-const courtsInfo = document.getElementById("courts-info");
-const courtsList = document.getElementById("courts-list");
-const qualifCourtsInfo = document.getElementById("qualif-courts-info");
-const qualifCourtsList = document.getElementById("qualif-courts-list");
-
-// Onglets "Qualif (Samedi)" / "Main-draw (Dimanche)" — n'existent que si la formule
-// active du tournoi comporte des qualifications (voir checkFormatAndInit tout en bas).
-// Sans qualifs, cachés : la page garde exactement son comportement d'avant (une seule
-// vue, le Main-draw).
+// Une ou deux journées selon la formule (voir buildSchedules dans js/tournoi-commun.js) :
+// - "12-quali16" : Qualif (samedi) puis Main-draw (dimanche) ;
+// - "12"/"16" avec "un jour par catégorie" : une catégorie le samedi, l'autre le dimanche ;
+// - sinon : une seule journée, pas d'onglets.
+// Chaque journée a son onglet et son panneau (samedi / dimanche).
 const dayTabs = document.getElementById("day-tabs");
 const dayButtons = document.querySelectorAll(".tab-button[data-day]");
 const dayPanels = {
-  qualif: document.getElementById("day-qualif"),
-  maindraw: document.getElementById("day-maindraw"),
+  saturday: {
+    panel: document.getElementById("day-saturday"),
+    info: document.getElementById("courts-info-saturday"),
+    list: document.getElementById("courts-list-saturday"),
+  },
+  sunday: {
+    panel: document.getElementById("day-sunday"),
+    info: document.getElementById("courts-info-sunday"),
+    list: document.getElementById("courts-list-sunday"),
+  },
 };
+let activeDay = "sunday";
 
 dayButtons.forEach((button) => {
-  button.addEventListener("click", () => {
-    const day = button.dataset.day;
-    dayButtons.forEach((b) => b.classList.toggle("active", b === button));
-    Object.entries(dayPanels).forEach(([key, panel]) => {
-      panel.hidden = key !== day;
-    });
-  });
+  button.addEventListener("click", () => switchDay(button.dataset.day));
 });
 
 function switchDay(day) {
-  const button = [...dayButtons].find((b) => b.dataset.day === day);
-  if (button) button.click();
+  activeDay = day;
+  dayButtons.forEach((b) => b.classList.toggle("active", b.dataset.day === day));
+  Object.entries(dayPanels).forEach(([key, { panel }]) => {
+    panel.hidden = key !== day;
+  });
 }
 
-// Terrains (GENDER_TERRAINS, COURTS) et plannings (maindrawScheduleRows,
-// qualifScheduleRows, horaires calculés par buildSchedules) : voir js/tournoi-commun.js
-// — partagés avec la page "Suivi d'équipe". Rempli au chargement (checkFormatAndInit).
-let schedules = { qualif: [], maindraw: [] };
+// Journées du tournoi, horaires calculés (voir js/tournoi-commun.js — partagé avec
+// la page "Suivi d'équipe"). Rempli au chargement (loadAllCourts).
+let days = [];
 
 // Place encore inconnue : le croisement fixé par le format ("2e Poule C",
 // "Vainqueur Barrage 2"...). Au-delà des quarts, juste "TBD" (comme le tableau).
@@ -45,9 +46,9 @@ function slotTeamLabel(match, teamsById, slot, index) {
   return slotPlaceholder(slot, index);
 }
 
-// `silent` (rafraîchissement automatique) : en cas d'erreur réseau, on garde
-// l'affichage actuel au lieu d'afficher un message d'erreur.
-async function loadCourts({ silent = false } = {}) {
+// Données du Main-draw (poules + tableau), avec de quoi retrouver le match d'une case
+// du planning. null en cas d'erreur réseau.
+async function fetchMaindrawData() {
   const [
     { data: pools, error: poolsError },
     { data: teams, error: teamsError },
@@ -59,49 +60,61 @@ async function loadCourts({ silent = false } = {}) {
     supabaseClient.from("matches").select("*, sets(*)").eq("phase", "poule").order("id", { ascending: true }),
     supabaseClient.from("matches").select("*, sets(*)").in("phase", PHASES_MAINDRAW_BRACKET),
   ]);
+  if (poolsError || teamsError || poolMatchesError || bracketError) return null;
 
-  if (poolsError || teamsError || poolMatchesError || bracketError) {
-    if (!silent) courtsInfo.textContent = "Erreur de chargement des données.";
-    return;
-  }
+  const matchesByPool = new Map();
+  poolMatches
+    .slice()
+    .sort((a, b) => a.id - b.id)
+    .forEach((m) => {
+      if (!matchesByPool.has(m.pool_id)) matchesByPool.set(m.pool_id, []);
+      matchesByPool.get(m.pool_id).push(m);
+    });
 
-  if (pools.length === 0) {
-    courtsInfo.textContent = "L'ordre des matchs sera affiché ici dès que les poules seront tirées.";
-    courtsList.innerHTML = "";
-    return;
-  }
-
-  courtsInfo.textContent = "";
-
-  const teamsById = new Map(teams.map((team) => [team.id, team]));
-  renderCourts(pools, teamsById, poolMatches, bracketMatches);
+  return {
+    teamsById: new Map(teams.map((team) => [team.id, team])),
+    isReady: (category) => pools.some((p) => p.category === category),
+    emptyText: "L'ordre des matchs sera affiché ici dès que les poules seront tirées.",
+    findPoolMatch: (category, poolLabel, index) => {
+      const pool = pools.find((p) => p.category === category && p.label === poolLabel);
+      return pool ? (matchesByPool.get(pool.id) || [])[index] : null;
+    },
+    findSlotMatch: (category, slot) => bracketMatches.find((m) => m.category === category && m.slot === slot),
+  };
 }
 
-// Pendant du loadCourts()/renderCourts() ci-dessus, pour la journée "Qualif".
-async function loadQualifCourts({ silent = false } = {}) {
+// Pendant de fetchMaindrawData() pour la journée "Qualif".
+async function fetchQualifData() {
   const [{ data: teams, error: teamsError }, { data: qualifMatches, error: qualifError }] = await Promise.all([
     supabaseClient.from("teams").select("*"),
     supabaseClient.from("matches").select("*, sets(*)").in("phase", PHASES_QUALIF),
   ]);
+  if (teamsError || qualifError) return null;
 
-  if (teamsError || qualifError) {
-    if (!silent) qualifCourtsInfo.textContent = "Erreur de chargement des données.";
+  return {
+    teamsById: new Map(teams.map((team) => [team.id, team])),
+    isReady: (category) => qualifMatches.some((m) => m.phase === "qualif_poule" && m.category === category),
+    emptyText: "L'ordre des matchs de qualification sera affiché ici dès que les poules de qualif seront générées.",
+    findPoolMatch: () => null,
+    findSlotMatch: (category, slot) => qualifMatches.find((m) => m.category === category && m.slot === slot),
+  };
+}
+
+// `silent` (rafraîchissement automatique) : en cas d'erreur réseau, on garde
+// l'affichage actuel au lieu d'afficher un message d'erreur.
+function renderDay(day, data, { silent = false } = {}) {
+  const { info, list } = dayPanels[day.key];
+  if (!data) {
+    if (!silent) info.textContent = "Erreur de chargement des données.";
     return;
   }
-
-  const pouleMatches = qualifMatches.filter((m) => m.phase === "qualif_poule");
-  const barrageMatches = qualifMatches.filter((m) => m.phase !== "qualif_poule");
-
-  if (pouleMatches.length === 0) {
-    qualifCourtsInfo.textContent = "L'ordre des matchs de qualification sera affiché ici dès que les poules de qualif seront générées.";
-    qualifCourtsList.innerHTML = "";
+  if (!day.categories.some((category) => data.isReady(category))) {
+    info.textContent = data.emptyText;
+    list.innerHTML = "";
     return;
   }
-
-  qualifCourtsInfo.textContent = "";
-
-  const teamsById = new Map(teams.map((team) => [team.id, team]));
-  renderQualifCourts(teamsById, pouleMatches, barrageMatches);
+  info.textContent = "";
+  renderCourtCards(list, day, data);
 }
 
 function teamLabel(teamId, teamsById) {
@@ -109,12 +122,11 @@ function teamLabel(teamId, teamsById) {
   return formatTeamShort(teamsById.get(teamId));
 }
 
-// Les 4 cartes "Terrain N" d'une journée. `findPoolMatch(category, poolLabel, index)`
-// et `findSlotMatch(category, slot)` disent où trouver le match d'une case du planning.
-function renderCourtCards(container, scheduleRows, findPoolMatch, findSlotMatch, teamsById) {
+// Les 4 cartes "Terrain N" d'une journée.
+function renderCourtCards(container, day, { findPoolMatch, findSlotMatch, teamsById }) {
   container.innerHTML = "";
 
-  COURTS.forEach((court) => {
+  day.courts.forEach((court) => {
     const card = document.createElement("div");
     card.className = "pool-card";
 
@@ -127,10 +139,10 @@ function renderCourtCards(container, scheduleRows, findPoolMatch, findSlotMatch,
     subtitle.textContent = court.category;
     card.appendChild(subtitle);
 
-    const terrainIndex = GENDER_TERRAINS[court.category].indexOf(court.terrain);
     const rows = [];
-    scheduleRows.forEach((scheduleRow) => {
-      const cell = scheduleCell(scheduleRow, terrainIndex);
+    day.rows.forEach((scheduleRow) => {
+      const cell = scheduleCell(scheduleRow, court.terrainIndex);
+      if (!cell) return; // terrain libre sur cette ligne (ex: demies sur 4 terrains)
       if (cell.poolLabel) {
         // Match de poule : n'apparaît qu'une fois les poules tirées.
         const match = findPoolMatch(court.category, cell.poolLabel, cell.matchIndex);
@@ -147,42 +159,9 @@ function renderCourtCards(container, scheduleRows, findPoolMatch, findSlotMatch,
       }
     });
 
-    appendPhaseSection(card, "Programme", rows, `${container.id}-terrain-${court.terrain}`);
+    appendPhaseSection(card, "Programme", rows, `${day.key}-terrain-${court.terrain}`);
     container.appendChild(card);
   });
-}
-
-function renderCourts(pools, teamsById, poolMatches, bracketMatches) {
-  const matchesByPool = new Map();
-  poolMatches
-    .slice()
-    .sort((a, b) => a.id - b.id)
-    .forEach((m) => {
-      if (!matchesByPool.has(m.pool_id)) matchesByPool.set(m.pool_id, []);
-      matchesByPool.get(m.pool_id).push(m);
-    });
-
-  renderCourtCards(
-    courtsList,
-    schedules.maindraw,
-    (category, poolLabel, index) => {
-      const pool = pools.find((p) => p.category === category && p.label === poolLabel);
-      return pool ? (matchesByPool.get(pool.id) || [])[index] : null;
-    },
-    (category, slot) => bracketMatches.find((m) => m.category === category && m.slot === slot),
-    teamsById
-  );
-}
-
-function renderQualifCourts(teamsById, pouleMatches, barrageMatches) {
-  const all = [...pouleMatches, ...barrageMatches];
-  renderCourtCards(
-    qualifCourtsList,
-    schedules.qualif,
-    () => null,
-    (category, slot) => all.find((m) => m.category === category && m.slot === slot),
-    teamsById
-  );
 }
 
 // `key` : l'état déplié/replié du terrain survit aux rafraîchissements automatiques.
@@ -253,7 +232,7 @@ function renderMatchRow(label, match, teamsById, slot, time, category) {
 }
 
 // Arrivée depuis un lien "voir ce match" de la page Suivi d'équipe
-// (ordre-des-matchs.html?day=qualif&anchor=slot:qb5) : bascule sur le bon onglet,
+// (ordre-des-matchs.html?day=saturday&anchor=slot:Hommes:qb5) : bascule sur le bon onglet,
 // déplie la section repliable qui contient la ligne visée, scrolle jusqu'à elle et la
 // met en surbrillance un instant.
 function handleDeepLink() {
@@ -279,28 +258,41 @@ function handleDeepLink() {
   });
 }
 
-// Les onglets Qualif/Main-draw n'existent que si la formule active comporte des
-// qualifications ; sinon, comportement inchangé (juste le Main-draw, pas d'onglets).
-async function loadAllCourts(options = {}) {
-  const settings = await fetchTournamentSettings();
-  schedules = buildSchedules(settings);
-  const hasQualifs = settings.format === "12-quali16";
-  await Promise.all([hasQualifs ? loadQualifCourts(options) : null, loadCourts(options)]);
-  return hasQualifs;
+// Anciens liens (?day=qualif / ?day=maindraw) toujours acceptés.
+function requestedDayKey() {
+  const day = new URLSearchParams(window.location.search).get("day");
+  return { qualif: "saturday", maindraw: "sunday" }[day] || day;
 }
 
-async function checkFormatAndInit() {
-  const hasQualifs = await loadAllCourts();
-  if (hasQualifs) dayTabs.hidden = false;
+// Réglages relus à chaque fois : un changement côté admin (formule, jours, horaires)
+// se voit aussi au rafraîchissement automatique.
+async function loadAllCourts(options = {}) {
+  const settings = await fetchTournamentSettings();
+  days = buildSchedules(settings);
 
-  if (hasQualifs) {
-    const requestedDay = new URLSearchParams(window.location.search).get("day");
-    switchDay(requestedDay === "maindraw" ? "maindraw" : "qualif");
-  }
+  const needs = (source) => days.some((day) => day.source === source);
+  const [maindrawData, qualifData] = await Promise.all([
+    needs("maindraw") ? fetchMaindrawData() : null,
+    needs("qualif") ? fetchQualifData() : null,
+  ]);
+  days.forEach((day) => renderDay(day, day.source === "qualif" ? qualifData : maindrawData, options));
 
+  // Onglets seulement s'il y a deux journées, titrés selon la formule.
+  dayTabs.hidden = days.length < 2;
+  dayButtons.forEach((button) => {
+    const day = days.find((d) => d.key === button.dataset.day);
+    button.hidden = !day;
+    if (day) button.textContent = day.title;
+  });
+  if (!days.some((day) => day.key === activeDay)) switchDay(days[0].key);
+}
+
+async function init() {
+  await loadAllCourts();
+  const requested = requestedDayKey();
+  switchDay(days.some((day) => day.key === requested) ? requested : days[0].key);
   handleDeepLink();
 }
 
-checkFormatAndInit();
-// Réglages d'horaires relus à chaque fois : un changement côté admin se voit aussi.
+init();
 onAutoRefresh(loadAllCourts);

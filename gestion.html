@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Gestion du tournoi — Sand System Tournament</title>
-  <link rel="stylesheet" href="css/style.css?v=70">
+  <link rel="stylesheet" href="css/style.css?v=71">
 </head>
 <body>
   <header class="site-header">
@@ -40,6 +40,27 @@
           <button type="button" class="format-card" data-format="12-quali16">12 équipes (qualifs 16)</button>
         </div>
         <p id="format-message" class="form-message"></p>
+
+        <div id="days-section" class="form days-section" hidden>
+          <h3>Jours</h3>
+          <label class="checkbox-label">
+            <input type="radio" name="days-mode" value="same">
+            Hommes et Femmes le même jour (2 terrains chacun)
+          </label>
+          <label class="checkbox-label">
+            <input type="radio" name="days-mode" value="split">
+            Un jour par catégorie (4 terrains)
+          </label>
+          <div id="days-split-fields" class="days-split-fields">
+            <label for="days-saturday">Le samedi</label>
+            <select id="days-saturday">
+              <option value="Femmes">Femmes</option>
+              <option value="Hommes">Hommes</option>
+            </select>
+            <span id="days-sunday-note" class="form-message"></span>
+          </div>
+          <p id="days-message" class="form-message"></p>
+        </div>
       </section>
 
       <section id="timing-section" hidden>
@@ -52,9 +73,9 @@
           </label>
 
           <div id="timing-fields">
-            <div class="timing-grid">
+            <div class="timing-grid timing-starts">
               <div id="timing-saturday-field">
-                <label for="timing-saturday">Début samedi</label>
+                <label for="timing-saturday" id="timing-saturday-label">Début samedi</label>
                 <input type="time" id="timing-saturday" required>
               </div>
               <div>
@@ -315,8 +336,8 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
   <script src="js/supabaseClient.js?v=1"></script>
-  <script src="js/tournoi-commun.js?v=4"></script>
+  <script src="js/tournoi-commun.js?v=5"></script>
   <script src="js/nav.js?v=6"></script>
-  <script src="js/gestion.js?v=75"></script>
+  <script src="js/gestion.js?v=76"></script>
 </body>
 </html>

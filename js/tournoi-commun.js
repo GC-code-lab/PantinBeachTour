@@ -238,58 +238,84 @@ function slotPlaceholder(slot, index, options = {}) {
 
 // --- Terrains et plannings (page "Ordre des matchs" et "Suivi d'équipe") ---
 
-// 4 terrains, dédiés en dur à une catégorie chacun. Les deux catégories suivent le
-// MÊME planning horaire, chacune sur ses 2 terrains : la 1re colonne d'un planning
-// va sur le 1er terrain de la catégorie, la 2e colonne sur le 2e.
+// 4 terrains. Quand Hommes et Femmes jouent le même jour, chaque catégorie a ses 2
+// terrains (GENDER_TERRAINS) et les deux suivent le MÊME planning : la 1re colonne
+// d'un planning va sur le 1er terrain de la catégorie, la 2e sur le 2e. Quand chaque
+// catégorie a sa journée (option "un jour par catégorie"), elle a les 4 terrains.
 const GENDER_TERRAINS = { Hommes: [2, 3], Femmes: [1, 4] };
-const COURTS = [
-  { terrain: 1, category: "Femmes" },
-  { terrain: 2, category: "Hommes" },
-  { terrain: 3, category: "Hommes" },
-  { terrain: 4, category: "Femmes" },
-];
+const ALL_TERRAINS = [1, 2, 3, 4];
+const CATEGORIES = ["Hommes", "Femmes"];
+
+function otherCategory(category) {
+  return category === "Hommes" ? "Femmes" : "Hommes";
+}
+
+// Terrains d'une journée : { terrain, category, terrainIndex } — `terrainIndex` =
+// colonne du planning jouée sur ce terrain (voir scheduleCell).
+function sharedCourts() {
+  return ALL_TERRAINS.map((terrain) => {
+    const category = CATEGORIES.find((c) => GENDER_TERRAINS[c].includes(terrain));
+    return { terrain, category, terrainIndex: GENDER_TERRAINS[category].indexOf(terrain) };
+  });
+}
+
+function soloCourts(category) {
+  return ALL_TERRAINS.map((terrain, terrainIndex) => ({ terrain, category, terrainIndex }));
+}
 
 // --- Plannings ---
-// Un planning = la liste ordonnée de ce qui se joue en même temps sur les 2 terrains
-// d'une catégorie (une "ligne"). L'ORDRE est fixe ; les HEURES sont calculées à partir
-// des réglages de la table tournament_formats (heure de début de chaque journée et
-// durée d'un match selon son format) — voir computeScheduleTimes.
+// Un planning = la liste ordonnée de ce qui se joue en même temps sur les terrains
+// d'une catégorie (une "ligne", 2 ou 4 colonnes selon le nombre de terrains). L'ORDRE
+// est fixe ; les HEURES sont calculées à partir des réglages de la table
+// tournament_formats (heure de début de chaque journée et durée d'un match selon son
+// format) — voir computeScheduleTimes.
 //
 // Types de ligne :
-// - poolPair   : 2 poules de 3 DIFFÉRENTES en parallèle, 1 match chacune (le tour `round`).
-// - poolRound4 : 1 poule de 4 sur les 2 terrains, ses 2 matchs du tour `round`.
+// - poolMatch  : poules de 3 DIFFÉRENTES en parallèle (`pools`, une par terrain),
+//                1 match chacune (le tour `round`).
+// - poolRound  : poules de 4 (`pools`), chacune sur 2 terrains, ses 2 matchs du tour `round`.
 // - qualifRound: 1 poule de qualif (brésilienne) sur les 2 terrains, son tour `round`.
-// - slotPair   : 2 matchs à slot fixe (tableau final, barrages de qualif).
+// - slots      : matchs à slot fixe en parallèle (tableau final, barrages de qualif).
+//                Moins de slots que de terrains : les terrains en trop sont libres.
 
 const POOL_LETTERS = ["A", "B", "C", "D"];
 
 const BRACKET_SCHEDULE_ROWS = [
-  { kind: "slotPair", slots: ["barrage-1", "barrage-2"] },
-  { kind: "slotPair", slots: ["barrage-3", "barrage-4"] },
-  { kind: "slotPair", slots: ["qf-1", "qf-2"] },
-  { kind: "slotPair", slots: ["qf-3", "qf-4"] },
-  { kind: "slotPair", slots: ["sf-1", "sf-2"] },
-  { kind: "slotPair", slots: ["finale", "petite-finale"] },
+  { kind: "slots", slots: ["barrage-1", "barrage-2"] },
+  { kind: "slots", slots: ["barrage-3", "barrage-4"] },
+  { kind: "slots", slots: ["qf-1", "qf-2"] },
+  { kind: "slots", slots: ["qf-3", "qf-4"] },
+  { kind: "slots", slots: ["sf-1", "sf-2"] },
+  { kind: "slots", slots: ["finale", "petite-finale"] },
 ];
 
-// Dimanche (Main-draw). Poules de 3 (formules "12" et "12-quali16") : 1 seul match par
+const BRACKET_SCHEDULE_ROWS_4_COURTS = [
+  { kind: "slots", slots: ["barrage-1", "barrage-2", "barrage-3", "barrage-4"] },
+  { kind: "slots", slots: ["qf-1", "qf-2", "qf-3", "qf-4"] },
+  { kind: "slots", slots: ["sf-1", "sf-2"] },
+  { kind: "slots", slots: ["finale", "petite-finale"] },
+];
+
+// Main-draw d'une catégorie, sur `courtCount` terrains (2 ou 4).
+// Sur 2 terrains — poules de 3 (formules "12" et "12-quali16") : 1 seul match par
 // poule et par tour, donc 2 poules différentes en parallèle (B+C, puis A+D). Poules de
-// 4 (formule "16") : comme le samedi des qualifs, une poule occupe les 2 terrains
-// pendant un tour, dans l'ordre A, B, C, D, puis tour suivant. Ensuite le tableau,
-// groupé par chemin (barrages 1+2 et quarts 1+2 alimentent la demi 1, 3+4 la demi 2).
-function maindrawScheduleRows(format) {
+// 4 (formule "16") : une poule occupe les 2 terrains pendant un tour, dans l'ordre
+// A, B, C, D, puis tour suivant. Ensuite le tableau, groupé par chemin (barrages 1+2
+// et quarts 1+2 alimentent la demi 1, 3+4 la demi 2).
+// Sur 4 terrains — poules de 3 : les 4 poules en même temps. Poules de 4 : A+B puis
+// C+D à chaque tour. Puis les 4 barrages, les 4 quarts, les demies, les finales.
+function maindrawScheduleRows(format, courtCount = 2) {
   const poolRows = [];
-  if (format === "16") {
-    for (let round = 0; round < 3; round++) {
-      POOL_LETTERS.forEach((letter) => poolRows.push({ kind: "poolRound4", pool: `Poule ${letter}`, round }));
-    }
-  } else {
-    for (let round = 0; round < 3; round++) {
-      poolRows.push({ kind: "poolPair", pools: ["Poule B", "Poule C"], round });
-      poolRows.push({ kind: "poolPair", pools: ["Poule A", "Poule D"], round });
+  for (let round = 0; round < 3; round++) {
+    if (format === "16") {
+      const groups = courtCount === 4 ? [["A", "B"], ["C", "D"]] : POOL_LETTERS.map((letter) => [letter]);
+      groups.forEach((letters) => poolRows.push({ kind: "poolRound", pools: letters.map((l) => `Poule ${l}`), round }));
+    } else {
+      const groups = courtCount === 4 ? [["A", "B", "C", "D"]] : [["B", "C"], ["A", "D"]];
+      groups.forEach((letters) => poolRows.push({ kind: "poolMatch", pools: letters.map((l) => `Poule ${l}`), round }));
     }
   }
-  return [...poolRows, ...BRACKET_SCHEDULE_ROWS];
+  return [...poolRows, ...(courtCount === 4 ? BRACKET_SCHEDULE_ROWS_4_COURTS : BRACKET_SCHEDULE_ROWS)];
 }
 
 // Samedi (qualifs, formule "12-quali16") : une poule occupe les 2 terrains à chaque
@@ -302,10 +328,10 @@ function qualifScheduleRows() {
   }
   return [
     ...rows,
-    { kind: "slotPair", slots: ["qb2", "qb4"] },
-    { kind: "slotPair", slots: ["qb1", "qb3"] },
-    { kind: "slotPair", slots: ["qb5", "qb7"] },
-    { kind: "slotPair", slots: ["qb6", "qb8"] },
+    { kind: "slots", slots: ["qb2", "qb4"] },
+    { kind: "slots", slots: ["qb1", "qb3"] },
+    { kind: "slots", slots: ["qb5", "qb7"] },
+    { kind: "slots", slots: ["qb6", "qb8"] },
   ];
 }
 
@@ -314,31 +340,32 @@ function qualifRoundSlots(letter, round) {
   return round === 0 ? [`q${letter}-r1-1`, `q${letter}-r1-2`] : [`q${letter}-r2-w`, `q${letter}-r2-l`];
 }
 
-// Ce qui se joue sur le terrain n°`terrainIndex` (0 ou 1) de la catégorie pour une
-// ligne de planning : soit un match de poule du Maindraw (repéré par sa poule et son
-// rang parmi les matchs de la poule, dans l'ordre de création), soit un match à slot fixe.
+// Ce qui se joue dans la colonne `terrainIndex` d'une ligne de planning : soit un
+// match de poule du Maindraw (repéré par sa poule et son rang parmi les matchs de la
+// poule, dans l'ordre de création), soit un match à slot fixe. null = terrain libre.
 function scheduleCell(row, terrainIndex) {
-  if (row.kind === "poolPair") {
+  if (row.kind === "poolMatch") {
     const pool = row.pools[terrainIndex];
-    return { poolLabel: pool, matchIndex: row.round, label: `${pool} · Tour ${row.round + 1}` };
+    return pool ? { poolLabel: pool, matchIndex: row.round, label: `${pool} · Tour ${row.round + 1}` } : null;
   }
-  if (row.kind === "poolRound4") {
-    return { poolLabel: row.pool, matchIndex: 2 * row.round + terrainIndex, label: `${row.pool} · Tour ${row.round + 1}` };
+  if (row.kind === "poolRound") {
+    const pool = row.pools[Math.floor(terrainIndex / 2)];
+    if (!pool) return null;
+    return { poolLabel: pool, matchIndex: 2 * row.round + (terrainIndex % 2), label: `${pool} · Tour ${row.round + 1}` };
   }
   if (row.kind === "qualifRound") {
-    return {
-      slot: qualifRoundSlots(row.poolLetter, row.round)[terrainIndex],
-      label: `Poule Qualif ${row.poolLetter} · Tour ${row.round + 1}`,
-    };
+    const slot = qualifRoundSlots(row.poolLetter, row.round)[terrainIndex];
+    return slot ? { slot, label: `Poule Qualif ${row.poolLetter} · Tour ${row.round + 1}` } : null;
   }
   const slot = row.slots[terrainIndex];
-  return { slot, label: slotLabel(slot) };
+  return slot ? { slot, label: slotLabel(slot) } : null;
 }
 
 // --- Horaires ---
 
 // Réglages par défaut, utilisés tant que l'admin n'a rien enregistré (ou si les
-// colonnes n'existent pas encore en base).
+// colonnes n'existent pas encore en base). `split_days` : en formule "12" ou "16",
+// chaque catégorie joue sa journée (sur les 4 terrains), `saturday_category` le samedi.
 const TIMING_DEFAULTS = {
   show_timing: true,
   saturday_start: "09:00",
@@ -346,13 +373,15 @@ const TIMING_DEFAULTS = {
   duration_1x21: 30,
   duration_2x15: 45,
   duration_2x21: 60,
+  split_days: false,
+  saturday_category: "Femmes",
 };
 
 // Format de jeu d'une ligne de planning : "1x21" (poule du Maindraw), "2x15" (qualifs,
 // barrages, et tout le tableau en formule "12-quali16"), "2x21" (quarts/demies/finales
 // des formules "12" et "16"). Mêmes règles que la validation des scores (js/gestion.js).
 function scheduleRowMatchFormat(row, format) {
-  if (row.kind === "poolPair" || row.kind === "poolRound4") return "1x21";
+  if (row.kind === "poolMatch" || row.kind === "poolRound") return "1x21";
   if (row.kind === "qualifRound") return "2x15";
   const slot = row.slots[0];
   if (slot.startsWith("qb") || slot.startsWith("barrage-")) return "2x15";
@@ -385,12 +414,60 @@ function computeScheduleTimes(rows, startClock, settings) {
   return timed;
 }
 
-// Les deux journées, horaires calculés. `qualif` est vide sans formule à qualifs.
+// L'option "un jour par catégorie" n'existe que sans qualifs (le samedi de la formule
+// "12-quali16" est déjà pris par les qualifs des deux catégories).
+function splitDaysAvailable(format) {
+  return format === "12" || format === "16";
+}
+
+function isSplitDays(settings) {
+  return Boolean(settings.split_days) && splitDaysAvailable(settings.format);
+}
+
+// Catégorie qui joue le samedi en mode "un jour par catégorie".
+function saturdayCategory(settings) {
+  return CATEGORIES.includes(settings.saturday_category) ? settings.saturday_category : "Femmes";
+}
+
+// Les journées du tournoi, dans l'ordre, horaires calculés. Chaque journée :
+// { key: "saturday"|"sunday", dayName, title, source: "qualif"|"maindraw" (quels
+//   matchs s'y jouent), courts (voir sharedCourts), categories, rows }
+// - "12-quali16" : samedi = qualifs, dimanche = Main-draw, les deux catégories ensemble.
+// - "12"/"16" un jour par catégorie : samedi = Main-draw d'une catégorie, dimanche = l'autre.
+// - sinon : une seule journée (le dimanche), les deux catégories ensemble.
 function buildSchedules(settings) {
-  return {
-    qualif: settings.format === "12-quali16" ? computeScheduleTimes(qualifScheduleRows(), settings.saturday_start, settings) : [],
-    maindraw: computeScheduleTimes(maindrawScheduleRows(settings.format), settings.sunday_start, settings),
-  };
+  const day = (key, title, source, rows, courts) => ({
+    key,
+    dayName: key === "saturday" ? "Samedi" : "Dimanche",
+    title,
+    source,
+    courts,
+    categories: [...new Set(courts.map((court) => court.category))],
+    rows: computeScheduleTimes(rows, settings[`${key}_start`], settings),
+  });
+
+  if (settings.format === "12-quali16") {
+    return [
+      day("saturday", "Qualif (Samedi)", "qualif", qualifScheduleRows(), sharedCourts()),
+      day("sunday", "Main-draw (Dimanche)", "maindraw", maindrawScheduleRows(settings.format), sharedCourts()),
+    ];
+  }
+  if (isSplitDays(settings)) {
+    const rows = maindrawScheduleRows(settings.format, 4);
+    const first = saturdayCategory(settings);
+    const second = otherCategory(first);
+    return [
+      day("saturday", `${first} (Samedi)`, "maindraw", rows, soloCourts(first)),
+      day("sunday", `${second} (Dimanche)`, "maindraw", rows, soloCourts(second)),
+    ];
+  }
+  return [day("sunday", "Main-draw (Dimanche)", "maindraw", maindrawScheduleRows(settings.format), sharedCourts())];
+}
+
+// Journée où se joue le match `slot` (null = match de poule du Maindraw) d'une catégorie.
+function scheduleDayFor(days, category, slot) {
+  const source = slot && (slot.startsWith("qb") || /^q[A-D]-r/.test(slot)) ? "qualif" : "maindraw";
+  return days.find((d) => d.source === source && d.categories.includes(category)) || null;
 }
 
 // La ligne de tournament_formats (formule + réglages d'horaires), complétée par les

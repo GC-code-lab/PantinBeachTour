@@ -239,6 +239,7 @@ async function loadTournamentFormats() {
   currentFormat = tournamentSettings.format;
   renderFormatButtons();
   applyTabVisibility();
+  renderDaysForm();
   renderTimingForm();
 }
 
@@ -303,12 +304,62 @@ formatButtons.forEach((button) => {
     tournamentSettings.format = format;
     renderFormatButtons();
     applyTabVisibility();
+    renderDaysForm();
     renderTimingForm();
     formatMessage.textContent = "Formule enregistrée.";
     formatMessage.style.color = "var(--color-ocean-dark)";
     loadAdminData();
   });
 });
+
+// --- Jours (onglet Formule) ---
+// Formules "12" et "16" : Hommes et Femmes le même jour (2 terrains chacun), ou une
+// catégorie le samedi et l'autre le dimanche (4 terrains chacune). Ne touche à aucun
+// match : seuls "Ordre des matchs" et "Suivi d'équipe" changent (voir buildSchedules).
+// Enregistré dès qu'on change le choix.
+const daysSection = document.getElementById("days-section");
+const daysModeInputs = document.querySelectorAll('input[name="days-mode"]');
+const daysSplitFields = document.getElementById("days-split-fields");
+const daysSaturdaySelect = document.getElementById("days-saturday");
+const daysSundayNote = document.getElementById("days-sunday-note");
+const daysMessage = document.getElementById("days-message");
+
+function renderDaysForm() {
+  daysSection.hidden = !splitDaysAvailable(currentFormat);
+  const split = Boolean(tournamentSettings.split_days);
+  daysModeInputs.forEach((input) => {
+    input.checked = input.value === (split ? "split" : "same");
+  });
+  daysSaturdaySelect.value = saturdayCategory(tournamentSettings);
+  daysSplitFields.hidden = !split;
+  daysSundayNote.textContent = `${otherCategory(daysSaturdaySelect.value)} le dimanche`;
+}
+
+async function saveDaysForm() {
+  const values = {
+    split_days: [...daysModeInputs].some((input) => input.checked && input.value === "split"),
+    saturday_category: daysSaturdaySelect.value,
+  };
+  const { error } = await supabaseClient.from("tournament_formats").update(values).eq("id", 1);
+
+  if (error) {
+    const missingColumns = /column/i.test(error.message);
+    daysMessage.textContent =
+      "Erreur : " + error.message + (missingColumns ? " — la requête SQL des jours a-t-elle été lancée dans Supabase ?" : "");
+    daysMessage.style.color = "var(--color-coral)";
+    renderDaysForm(); // revient à ce qui est réellement enregistré
+    return;
+  }
+
+  tournamentSettings = { ...tournamentSettings, ...values };
+  renderDaysForm();
+  updateTimingPreview();
+  daysMessage.textContent = "Jours enregistrés.";
+  daysMessage.style.color = "var(--color-ocean-dark)";
+}
+
+daysModeInputs.forEach((input) => input.addEventListener("change", saveDaysForm));
+daysSaturdaySelect.addEventListener("change", saveDaysForm);
 
 // --- Horaires (onglet Formule) ---
 // Heure de début de chaque journée + durée d'un match selon son format. Les heures
@@ -347,18 +398,27 @@ function readTimingForm() {
 
 // Champs utiles selon la formule + fin de journée prévue, recalculée à chaque frappe.
 function updateTimingPreview() {
-  const isQuali16 = currentFormat === "12-quali16";
   const values = readTimingForm();
   timingFields.hidden = !values.show_timing;
-  document.getElementById("timing-saturday-field").hidden = !isQuali16;
   // En formule "12-quali16", aucun match ne se joue en 2 sets à 21.
-  document.getElementById("timing-2x21-field").hidden = isQuali16;
-  document.getElementById("timing-sunday-label").textContent = isQuali16 ? "Début dimanche" : "Début du tournoi";
+  document.getElementById("timing-2x21-field").hidden = currentFormat === "12-quali16";
 
-  const schedules = buildSchedules({ ...values, show_timing: true, format: currentFormat });
-  const parts = [];
-  if (isQuali16) parts.push(`samedi vers ${schedules.qualif.endTime}`);
-  parts.push(`${isQuali16 ? "dimanche " : ""}vers ${schedules.maindraw.endTime}`);
+  const days = buildSchedules({ ...tournamentSettings, ...values, show_timing: true, format: currentFormat });
+  const twoDays = days.length > 1;
+  // Libellé d'une journée : "samedi", ou "samedi (Femmes)" si une seule catégorie y joue.
+  const dayLabel = (day) => {
+    const name = day.dayName.toLowerCase();
+    return day.categories.length === 1 ? `${name} (${day.categories[0]})` : name;
+  };
+  const saturday = days.find((day) => day.key === "saturday");
+  const sunday = days.find((day) => day.key === "sunday");
+  document.getElementById("timing-saturday-field").hidden = !saturday;
+  if (saturday) document.getElementById("timing-saturday-label").textContent = `Début ${dayLabel(saturday)}`;
+  document.getElementById("timing-sunday-label").textContent = twoDays
+    ? `Début ${dayLabel(sunday)}`
+    : "Début du tournoi";
+
+  const parts = days.map((day) => `${twoDays ? `${dayLabel(day)} ` : ""}vers ${day.rows.endTime}`);
   timingSummary.textContent = `Fin prévue : ${parts.join(" · ")}.`;
 }
 

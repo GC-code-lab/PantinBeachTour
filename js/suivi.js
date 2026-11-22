@@ -11,15 +11,11 @@ const trackingSection = document.getElementById("tracking-section");
 let allTeams = [];
 let selectedTeam = null;
 
-// Qualif ou Main-draw ? Détermine vers quel onglet de "Ordre des matchs" un slot pointe.
-function slotDay(slot) {
-  if (!slot) return "maindraw";
-  if (slot.startsWith("qb") || /^q[A-D]-r/.test(slot)) return "qualif";
-  return "maindraw";
-}
-
-function matchLink(day, anchor) {
-  return `ordre-des-matchs.html?day=${day}&anchor=${encodeURIComponent(anchor)}`;
+// Lien vers la ligne d'un match dans "Ordre des matchs", sur l'onglet de sa journée.
+function matchLink(category, slot, matchId) {
+  const day = scheduleDayFor(days, category, slot);
+  const dayParam = day ? `day=${day.key}&` : "";
+  return `ordre-des-matchs.html?${dayParam}anchor=${encodeURIComponent(matchAnchor(category, slot, matchId))}`;
 }
 
 // Décrit l'adversaire d'un match (existant ou pas encore créé), dans cet ordre :
@@ -156,17 +152,15 @@ async function loadTeamTimeline(team, { silent = false } = {}) {
   // Index "case du planning" -> horaire/terrain, construit depuis les plannings
   // partagés (js/tournoi-commun.js) : clé "pool:<poule>:<rang du match>" pour un
   // match de poule du Maindraw, "slot:<slot>" pour un match à slot fixe.
-  const terrains = GENDER_TERRAINS[team.category];
   const scheduleIndex = new Map();
-  [
-    ["qualif", schedules.qualif],
-    ["maindraw", schedules.maindraw],
-  ].forEach(([day, rows]) => {
-    rows.forEach((row) => {
-      [0, 1].forEach((terrainIndex) => {
-        const cell = scheduleCell(row, terrainIndex);
+  days.forEach((day, dayIndex) => {
+    const courts = day.courts.filter((court) => court.category === team.category);
+    day.rows.forEach((row) => {
+      courts.forEach((court) => {
+        const cell = scheduleCell(row, court.terrainIndex);
+        if (!cell) return;
         const key = cell.poolLabel ? `pool:${cell.poolLabel}:${cell.matchIndex}` : `slot:${cell.slot}`;
-        scheduleIndex.set(key, { time: row.time, order: row.order, day, terrain: terrains[terrainIndex] });
+        scheduleIndex.set(key, { time: row.time, order: row.order, dayIndex, dayName: day.dayName, terrain: court.terrain });
       });
     });
   });
@@ -189,14 +183,14 @@ async function loadTeamTimeline(team, { silent = false } = {}) {
     .map((m) => ({ match: m, schedule: resolveSchedule(m) }))
     .filter((row) => row.schedule);
 
-  // Samedi (qualif) avant dimanche (Main-draw), puis ordre de passage dans la journée.
+  // Samedi avant dimanche, puis ordre de passage dans la journée.
   confirmed.sort((a, b) => scheduleSortKey(a.schedule) - scheduleSortKey(b.schedule));
 
   renderTimeline(team, teamsById, confirmed);
 }
 
 function scheduleSortKey(schedule) {
-  return (schedule.day === "qualif" ? 0 : 1000) + schedule.order;
+  return schedule.dayIndex * 1000 + schedule.order;
 }
 
 // --- Rendu ---
@@ -246,8 +240,9 @@ function renderMatchCard(team, teamsById, match, schedule) {
   const card = document.createElement("div");
   card.className = match.status === "termine" ? "match-row match-row-done" : "match-row";
 
-  // Horaires masqués par l'admin : on indique juste le jour s'il y en a deux.
-  const timeText = schedule.time || (schedules.qualif.length > 0 ? (schedule.day === "qualif" ? "Samedi" : "Dimanche") : "");
+  // Le jour n'est indiqué que si le tournoi dure deux jours.
+  const dayText = days.length > 1 ? schedule.dayName : "";
+  const timeText = [dayText, schedule.time].filter(Boolean).join(" ");
   if (timeText) {
     const timeTag = document.createElement("span");
     timeTag.className = "match-time";
@@ -257,7 +252,7 @@ function renderMatchCard(team, teamsById, match, schedule) {
 
   const terrainTag = document.createElement("a");
   terrainTag.className = "match-order-tag match-order-link";
-  terrainTag.href = matchLink(slotDay(match.slot), matchAnchor(team.category, match.slot, match.id));
+  terrainTag.href = matchLink(team.category, match.slot, match.id);
   terrainTag.textContent = `${schedule.label} · Terrain ${schedule.terrain}`;
   card.appendChild(terrainTag);
 
@@ -266,7 +261,7 @@ function renderMatchCard(team, teamsById, match, schedule) {
 
   const opponent = document.createElement(linkSlot ? "a" : "span");
   opponent.className = linkSlot ? "match-team team2 hint-match-link" : "match-team team2";
-  if (linkSlot) opponent.href = matchLink(slotDay(linkSlot), matchAnchor(team.category, linkSlot, null));
+  if (linkSlot) opponent.href = matchLink(team.category, linkSlot, null);
   opponent.textContent = `vs ${opponentText}`;
   card.appendChild(opponent);
 
@@ -293,8 +288,8 @@ function renderMatchCard(team, teamsById, match, schedule) {
   return card;
 }
 
-// Plannings avec horaires calculés (voir js/tournoi-commun.js), lus une fois au chargement.
-let schedules = { qualif: [], maindraw: [] };
+// Journées du tournoi, horaires calculés (voir buildSchedules dans js/tournoi-commun.js).
+let days = [];
 
 async function init() {
   const [{ data, error }, settings] = await Promise.all([
@@ -302,12 +297,14 @@ async function init() {
     fetchTournamentSettings(),
   ]);
   if (!error && data) allTeams = data;
-  schedules = buildSchedules(settings);
+  days = buildSchedules(settings);
 }
 
 init();
 
 // Rafraîchissement automatique : seulement si une équipe est affichée.
 onAutoRefresh(async (options) => {
-  if (selectedTeam) await loadTeamTimeline(selectedTeam, options);
+  if (!selectedTeam) return;
+  days = buildSchedules(await fetchTournamentSettings()); // réglages changés côté admin
+  await loadTeamTimeline(selectedTeam, options);
 });
